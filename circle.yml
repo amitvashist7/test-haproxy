@@ -1,0 +1,12 @@
+machine:
+  services:
+    - docker
+dependencies:
+  override:
+    - docker build -t haproxy .
+    - docker run -d --name web1 tutum/hello-world
+    - docker run -d --name web2 tutum/hello-world
+test:
+  override:
+    - docker run -d -p 80:80 --link web1:web1 --link web2:web2 haproxy; sleep 10
+    - curl --retry 10 --retry-delay 5 -L -I http://localhost | grep "200 OK"
