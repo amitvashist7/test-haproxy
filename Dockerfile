@@ -1,11 +1,14 @@
 FROM ubuntu:trusty
 MAINTAINER Bernardo Pericacho <bernardo@tutum.co> && Feng Honglin <hfeng@tutum.co>
 
-RUN apt-get update &&  DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common && add-apt-repository ppa:vbernat/haproxy-1.5
-
-# Install required packages
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y haproxy python-pip
-
+#RUN apt-get update &&  DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common && add-apt-repository ppa:vbernat/haproxy-1.5
+RUN echo 'deb http://ppa.launchpad.net/vbernat/haproxy-1.5/ubuntu trusty main' >> /etc/apt/sources.list && \
+    echo 'deb-src http://ppa.launchpad.net/vbernat/haproxy-1.5/ubuntu trusty main' >> /etc/apt/sources.list && \
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 505D97A41C61B9CD && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends haproxy python-pip
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 # Add configuration and scripts
 ADD requirements.txt /requirements.txt
 RUN pip install -r /requirements.txt
@@ -18,16 +21,22 @@ ADD conf/haproxy.cfg.json /etc/haproxy/empty_haproxy.cfg.json
 
 # PORT to load balance and to expose (also update the EXPOSE directive below)
 ENV PORT 80
+
 # MODE of operation (http, tcp)
 ENV MODE http
+
 # algorithm for load balancing (roundrobin, source, leastconn, ...)
 ENV BALANCE roundrobin
+
 # maximum number of connections
 ENV MAXCONN 4096
+
 # list of options separated by commas
 ENV OPTIONS redispatch
+
 # list of timeout entries separated by commas
 ENV TIMEOUTS connect 5000,client 50000,server 50000
+
 # SSL certificate to use (optional)
 ENV SSL_CERT **None**
 
