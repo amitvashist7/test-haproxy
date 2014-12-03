@@ -180,7 +180,7 @@ if __name__ == "__main__":
             # Get balancer dictionary and clusters from env vars
             balancer_dictionary_from_env_vars, clusters = get_haproxy_dict_from_env_vars_dict(os.environ)
 
-            if clusters != {}:
+            if clusters != {} and TUTUM_AUTH:
                 for cluster_name, uri in clusters.iteritems():
 
                     # Get container cluster info
