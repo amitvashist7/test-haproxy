@@ -1,23 +1,19 @@
 FROM ubuntu:trusty
-MAINTAINER Bernardo Pericacho <bernardo@tutum.co> && Feng Honglin <hfeng@tutum.co>
+MAINTAINER Feng Honglin <hfeng@tutum.co>
 
-#RUN apt-get update &&  DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common && add-apt-repository ppa:vbernat/haproxy-1.5
+# Install pip and haproxy
 RUN echo 'deb http://ppa.launchpad.net/vbernat/haproxy-1.5/ubuntu trusty main' >> /etc/apt/sources.list && \
     echo 'deb-src http://ppa.launchpad.net/vbernat/haproxy-1.5/ubuntu trusty main' >> /etc/apt/sources.list && \
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 505D97A41C61B9CD && \
     apt-get update && \
-    apt-get install -y --no-install-recommends haproxy python-pip
+    apt-get install -y --no-install-recommends haproxy python-pip && \
     apt-get clean && \
+    pip install requests==2.2.1 && \
     rm -rf /var/lib/apt/lists/*
-# Add configuration and scripts
-ADD requirements.txt /requirements.txt
-RUN pip install -r /requirements.txt
 
-ADD main.py /main.py
+ADD haproxy.py /haproxy.py
 ADD run.sh /run.sh
-RUN chmod 755 /*.sh
-ADD conf/haproxy.cfg.json /etc/haproxy/haproxy.cfg.json
-ADD conf/haproxy.cfg.json /etc/haproxy/empty_haproxy.cfg.json
+RUN chmod +x /*.sh
 
 # PORT to load balance and to expose (also update the EXPOSE directive below)
 ENV PORT 80
@@ -32,13 +28,16 @@ ENV BALANCE roundrobin
 ENV MAXCONN 4096
 
 # list of options separated by commas
-ENV OPTIONS redispatch
+ENV OPTION redispatch, httplog, dontlognull
 
 # list of timeout entries separated by commas
-ENV TIMEOUTS connect 5000,client 50000,server 50000
+ENV TIMEOUT connect 5000, client 50000, server 50000
+
+# Virtual host
+ENV VIRTUAL_HOST **None**
 
 # SSL certificate to use (optional)
 ENV SSL_CERT **None**
 
-EXPOSE 80
+EXPOSE 80 443
 CMD ["/run.sh"]
