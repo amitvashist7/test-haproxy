@@ -11,10 +11,6 @@ RUN echo 'deb http://ppa.launchpad.net/vbernat/haproxy-1.5/ubuntu trusty main' >
     pip install requests==2.2.1 && \
     rm -rf /var/lib/apt/lists/*
 
-ADD haproxy.py /haproxy.py
-ADD run.sh /run.sh
-RUN chmod +x /*.sh
-
 # PORT to load balance and to expose (also update the EXPOSE directive below)
 ENV PORT 80
 
@@ -38,6 +34,11 @@ ENV VIRTUAL_HOST **None**
 
 # SSL certificate to use (optional)
 ENV SSL_CERT **None**
+
+# Add scripts
+ADD haproxy.py /haproxy.py
+ADD run.sh /run.sh
+RUN chmod +x /*.sh
 
 EXPOSE 80 443
 CMD ["/run.sh"]
