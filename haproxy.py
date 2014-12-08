@@ -18,6 +18,7 @@ MODE = os.getenv("MODE", "http")
 BALANCE = os.getenv("BALANCE", "roundrobin")
 MAXCONN = os.getenv("MAXCONN", "4096")
 SSL = os.getenv("SSL", "")
+SESSION_COOKIE = os.getenv("SESSION_COOKIE")
 OPTION = os.getenv("OPTION", "redispatch, httplog, dontlognull, forwardfor").split(",")
 TIMEOUT = os.getenv("TIMEOUT", "connect 5000, client 50000, server 50000").split(",")
 VIRTUAL_HOST = os.getenv("VIRTUAL_HOST", None)
@@ -120,18 +121,33 @@ def update_cfg(cfg, backend_routes, vhost):
         for service_name, domain_name in vhost.iteritems():
             service_name = service_name.upper()
             backend = []
+            if SESSION_COOKIE:
+                backend.append("appsession %s len 64 timeout 3h request-learn prefix" % (SESSION_COOKIE, ))
+
             backend.append("balance %s" % BALANCE)
             for container_name, addr_port in backend_routes.iteritems():
                 if container_name.startswith(service_name):
-                    backend.append("server %s %s:%s" % (container_name, addr_port["addr"], addr_port["port"]))
+                    server_string = "server %s %s:%s" % (container_name, addr_port["addr"], addr_port["port"])
+                    if SESSION_COOKIE:
+                        server_string += " cookie check"
+
+                    backend.append(server_string)
             if backend:
                 cfg["backend %s_cluster" % service_name] = sorted(backend)
 
     else:
         backend = []
+        if SESSION_COOKIE:
+            backend.append("appsession %s len 64 timeout 3h request-learn prefix" % (SESSION_COOKIE, ))
+            
         backend.append("balance %s" % BALANCE)
         for container_name, addr_port in backend_routes.iteritems():
-            backend.append("server %s %s:%s" % (container_name, addr_port["addr"], addr_port["port"]))
+            server_string = "server %s %s:%s" % (container_name, addr_port["addr"], addr_port["port"])
+            if SESSION_COOKIE:
+                server_string += " cookie check"
+
+            backend.append(server_string)
+
         cfg["backend default_service"] = sorted(backend)
 
     logger.debug("New cfg: %s", cfg)
