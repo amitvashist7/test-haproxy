@@ -38,12 +38,11 @@ Check [the HAproxy configuration manual](http://haproxy.1wt.eu/download/1.4/doc/
 Usage within Tutum
 ------------------
 
-Launch your applicaiton within Tutum's web interface.
+Launch the service you want to load-balance using Tutum.
 
-Then, launch another application with tutum/haproxy which is linked to the application cluster created earlier, and with "Full Access" API role (or other appropiate read-only role).
+Then, launch the load balancer. To do this, select `Jumpstarts` > `Proxies` and select `tutum/haproxy`. During the 3rd step of the wizard, link to the service created earlier, and add "Full Access" API role (this will allow HAproxy to be updated dynamically by querying Tutum's API). 
 
-That's it - the proxy container will start querying Tutum's API for an updated list of application cluster members and reconfigure itself automatically.
-
+That's it - the proxy container will start querying Tutum's API for an updated list of containers in the service and reconfigure itself automatically.
 
 How to use this container
 -------------------------
