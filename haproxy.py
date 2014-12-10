@@ -131,7 +131,14 @@ def update_cfg(cfg, backend_routes, vhost):
                     if SESSION_COOKIE:
                         server_string += " cookie check"
 
-                    backend.append(server_string)
+                    # Do not add duplicate backend routes
+                    duplicated = False
+                    for server_str in backend:
+                        if "%s:%s" % (container_name, addr_port["addr"], addr_port["port"]) in server_str:
+                            duplicated = True
+                            break
+                    if not duplicated:
+                        backend.append(server_string)
             if backend:
                 cfg["backend %s_cluster" % service_name] = sorted(backend)
 
@@ -139,14 +146,21 @@ def update_cfg(cfg, backend_routes, vhost):
         backend = []
         if SESSION_COOKIE:
             backend.append("appsession %s len 64 timeout 3h request-learn prefix" % (SESSION_COOKIE, ))
-            
+
         backend.append("balance %s" % BALANCE)
         for container_name, addr_port in backend_routes.iteritems():
             server_string = "server %s %s:%s" % (container_name, addr_port["addr"], addr_port["port"])
             if SESSION_COOKIE:
                 server_string += " cookie check"
 
-            backend.append(server_string)
+            # Do not add duplicate backend routes
+            duplicated = False
+            for server_str in backend:
+                if "%s:%s" % (addr_port["addr"], addr_port["port"]) in server_str:
+                    duplicated = True
+                    break
+            if not duplicated:
+                backend.append(server_string)
 
         cfg["backend default_service"] = sorted(backend)
 
