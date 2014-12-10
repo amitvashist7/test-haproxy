@@ -223,7 +223,7 @@ if __name__ == "__main__":
                     r = session.get(url, headers=headers)
                     if r.status_code != 200:
                         raise Exception(
-                            "Request url %s gives us a %d error code. Response: %s" % (r.status_code, r.text))
+                            "Request url %s gives us a %d error code. Response: %s" % (url, r.status_code, r.text))
                     else:
                         r.raise_for_status()
 
