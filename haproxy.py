@@ -136,7 +136,7 @@ def update_cfg(cfg, backend_routes, vhost):
                     # Do not add duplicate backend routes
                     duplicated = False
                     for server_str in backend:
-                        if "%s:%s" % (container_name, addr_port["addr"], addr_port["port"]) in server_str:
+                        if "%s:%s" % (addr_port["addr"], addr_port["port"]) in server_str:
                             duplicated = True
                             break
                     if not duplicated:
