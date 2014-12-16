@@ -30,9 +30,9 @@ DEBUG = os.getenv("DEBUG", False)
 CONFIG_FILE = '/etc/haproxy/haproxy.cfg'
 HAPROXY_CMD = ['/usr/sbin/haproxy', '-f', CONFIG_FILE, '-db']
 POLLING_PERIOD = 30
-LINK_ENV_PATRTERN = "_PORT_%s_TCP" % PORT
-LINK_ADDR_SUFFIX = LINK_ENV_PATRTERN + "_ADDR"
-LINK_PORT_SUFFIX = LINK_ENV_PATRTERN + "_PORT"
+LINK_ENV_PATTERN = "_PORT_%s_TCP" % PORT
+LINK_ADDR_SUFFIX = LINK_ENV_PATTERN + "_ADDR"
+LINK_PORT_SUFFIX = LINK_ENV_PATTERN + "_PORT"
 TUTUM_URL_SUFFIX = "_TUTUM_API_URL"
 
 # Global Var
@@ -88,7 +88,7 @@ def get_backend_routes(dict_var):
     # 'HELLO_WORLD_2': {'addr': '172.17.0.95', 'port': '80'}}
     addr_port_dict = {}
     for name, value in dict_var.iteritems():
-        position = string.find(name, LINK_ENV_PATRTERN)
+        position = string.find(name, LINK_ENV_PATTERN)
         if position != -1:
             container_name = name[:position]
             add_port = addr_port_dict.get(container_name, {'addr': "", 'port': ""})
