@@ -75,6 +75,8 @@ def get_tutum_api_urls(dict_var):
     for name, value in dict_var.iteritems():
         if name == "SERVICE_TUTUM_API_URL":
             continue
+        if name.endswith("_ENV_TUTUM_API_URL"):
+            continue
         position = string.find(name, TUTUM_URL_SUFFIX)
         if position != -1 and name.endswith(TUTUM_URL_SUFFIX):
             cluster_name = name[:position]
