@@ -9,11 +9,11 @@ if [ "${SSL_CERT}" = "**None**" ]; then
 fi
 
 if [ -n "$SSL_CERT" ]; then
-    echo "SSL certificate provided, running HAProxy in https mode"
+    echo "SSL certificate provided!"
     echo -e "${SSL_CERT}" > /servercert.pem
     export SSL="ssl crt /servercert.pem"
 else
-    echo "No SSL certificate, running HAProxy in http mode"
+    echo "No SSL certificate provided"
 fi
 
 exec python /haproxy.py 

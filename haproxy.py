@@ -188,10 +188,8 @@ def reload_haproxy():
 
 
 if __name__ == "__main__":
-    if DEBUG:
-        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-    else:
-        logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+    logging.basicConfig(stream=sys.stdout)
+    logging.getLogger(__name__).setLevel(logging.DEBUG if DEBUG else logging.INFO)
 
     cfg = create_default_cfg(MAXCONN, MODE)
 
