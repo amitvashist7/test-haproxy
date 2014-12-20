@@ -5,6 +5,7 @@ import time
 import string
 import subprocess
 import sys
+import re
 from collections import OrderedDict
 
 import requests
@@ -22,6 +23,7 @@ SESSION_COOKIE = os.getenv("SESSION_COOKIE")
 OPTION = os.getenv("OPTION", "redispatch, httplog, dontlognull, forwardfor").split(",")
 TIMEOUT = os.getenv("TIMEOUT", "connect 5000, client 50000, server 50000").split(",")
 VIRTUAL_HOST = os.getenv("VIRTUAL_HOST", None)
+TUTUM_CONTAINER_API_URL = os.getenv("TUTUM_CONTAINER_API_URL", None)
 
 TUTUM_AUTH = os.getenv("TUTUM_AUTH")
 DEBUG = os.getenv("DEBUG", False)
@@ -37,6 +39,8 @@ TUTUM_URL_SUFFIX = "_TUTUM_API_URL"
 
 # Global Var
 HAPROXY_CURRENT_SUBPROCESS = None
+
+endpoint_match = re.compile(r"(?P<proto>tcp|udp):\/\/(?P<addr>[^:]*):(?P<port>.*)")
 
 
 def get_cfg_text(cfg):
@@ -67,22 +71,6 @@ def create_default_cfg(maxconn, mode):
             cfg["defaults"].append("timeout %s" % timeout.strip())
 
     return cfg
-
-
-def get_tutum_api_urls(dict_var):
-    # return sth like: {'HELLO_WORLD': 'https://dashboard.tutum.co/api/v1/service/b4976881-9b87-4cc8-a41e-78ea56ca21c2/'}
-    service_urls_dict = {}
-    for name, value in dict_var.iteritems():
-        if name == "SERVICE_TUTUM_API_URL":
-            continue
-        if name.endswith("_ENV_TUTUM_API_URL"):
-            continue
-        position = string.find(name, TUTUM_URL_SUFFIX)
-        if position != -1 and name.endswith(TUTUM_URL_SUFFIX):
-            cluster_name = name[:position]
-            service_urls_dict[cluster_name] = value
-
-    return service_urls_dict
 
 
 def get_backend_routes(dict_var):
@@ -200,10 +188,8 @@ def reload_haproxy():
 
 
 if __name__ == "__main__":
-    if DEBUG:
-        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-    else:
-        logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+    logging.basicConfig(stream=sys.stdout)
+    logging.getLogger(__name__).setLevel(logging.DEBUG if DEBUG else logging.INFO)
 
     cfg = create_default_cfg(MAXCONN, MODE)
 
@@ -214,52 +200,48 @@ if __name__ == "__main__":
             tmp = host.split("=", 2)
             if len(tmp) == 2:
                 vhost[tmp[0].strip()] = tmp[1].strip()
-    tutum_api_urls = get_tutum_api_urls(os.environ)
 
-    if tutum_api_urls:
+    # Tell the user the mode of autoupdate we are using, if any
+    if TUTUM_CONTAINER_API_URL:
         if TUTUM_AUTH:
-            logger.info("HAproxy is running in Tutum with privileged permission")
+            logger.info("HAproxy has access to Tutum API - will reload list of backends every %d seconds", POLLING_PERIOD)
         else:
-            logger.info("HAproxy is running in Tutum without privileged permission")
+            logger.warning("HAproxy doesn't have access to Tutum API and it's running in Tutum - you might want to give "
+                "an API role to this service for automatic backend reconfiguration")
+    else:
+        logger.info("HAproxy is not running in Tutum")
     session = requests.Session()
     headers = {"Authorization": TUTUM_AUTH}
 
-    # Start HAProxy
-    backend_routes = get_backend_routes(os.environ)
-    update_cfg(cfg, backend_routes, vhost)
-    cfg_text = get_cfg_text(cfg)
-    logger.info("HAProxy cfg:\n\n%s\n" % cfg_text)
-    save_config_file(cfg_text, CONFIG_FILE)
-    reload_haproxy()
-
+    # Main loop
+    old_text = ""
     while True:
         try:
-            # Runs in tutum with full access, able to update backend dynamically on service scaling
-            if tutum_api_urls and TUTUM_AUTH:
-                for service_name, url in tutum_api_urls.iteritems():
-                    # Get service info
-                    r = session.get(url, headers=headers)
-                    if r.status_code != 200:
-                        raise Exception(
-                            "Request url %s gives us a %d error code. Response: %s" % (url, r.status_code, r.text))
-                    else:
-                        r.raise_for_status()
+            if TUTUM_CONTAINER_API_URL and TUTUM_AUTH:
+                # Running on Tutum with API access - fetch updated list of environment variables
+                r = session.get(TUTUM_CONTAINER_API_URL, headers=headers)
+                r.raise_for_status()
+                container_details = r.json()
 
-                    service_details = r.json()
-                    logger.debug("Balancer: Container Cluster info. %s", service_details)
+                backend_routes = {}
+                for link in container_details.get("linked_to_container", []):
+                    for port, endpoint in link.get("endpoints", {}).iteritems():
+                        if port == "%s/tcp" % PORT:
+                            backend_routes[link["name"]] = endpoint_match.match(endpoint).groupdict()
+            else:
+                # No Tutum API access - configuring backends based on static environment variables
+                backend_routes = get_backend_routes(os.environ)
 
-                    # Update backend routes from the response of tutum API
-                    backend_routes = get_backend_routes(service_details.get("link_variables", {}))
-                    update_cfg(cfg, backend_routes, vhost)
-                    old_text = cfg_text
-                    cfg_text = get_cfg_text(cfg)
+            # Update backend routes
+            update_cfg(cfg, backend_routes, vhost)
+            cfg_text = get_cfg_text(cfg)
 
-                    # if cfg changes, write to file
-                    if old_text != cfg_text:
-                        logger.info("HAProxy configuration has been changed")
-                        logger.info("HAProxy cfg:\n%s" % cfg_text)
-                        save_config_file(cfg_text, CONFIG_FILE)
-                        reload_haproxy()
+            # If cfg changes, write to file
+            if old_text != cfg_text:
+                logger.info("HAProxy configuration has been changed:\n%s" % cfg_text)
+                save_config_file(cfg_text, CONFIG_FILE)
+                reload_haproxy()
+                old_text = cfg_text
         except Exception as e:
             logger.exception("Error: %s" % e)
 
