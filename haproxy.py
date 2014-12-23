@@ -36,6 +36,7 @@ LINK_ENV_PATTERN = "_PORT_%s_TCP" % PORT
 LINK_ADDR_SUFFIX = LINK_ENV_PATTERN + "_ADDR"
 LINK_PORT_SUFFIX = LINK_ENV_PATTERN + "_PORT"
 TUTUM_URL_SUFFIX = "_TUTUM_API_URL"
+VIRTUAL_HOST_SUFFIX = "_ENV_VIRTUAL_HOST"
 
 # Global Var
 HAPROXY_CURRENT_SUBPROCESS = None
@@ -187,26 +188,35 @@ def reload_haproxy():
         HAPROXY_CURRENT_SUBPROCESS = subprocess.Popen(HAPROXY_CMD)
 
 
-if __name__ == "__main__":
-    logging.basicConfig(stream=sys.stdout)
-    logging.getLogger(__name__).setLevel(logging.DEBUG if DEBUG else logging.INFO)
-
-    cfg = create_default_cfg(MAXCONN, MODE)
-
-    # Parse Virtual Host
-    vhost = {}
+def update_virtualhost(vhost):
     if VIRTUAL_HOST:
         for host in VIRTUAL_HOST.split(","):
             tmp = host.split("=", 2)
             if len(tmp) == 2:
                 vhost[tmp[0].strip()] = tmp[1].strip()
 
+    for name, value in os.environ.iteritems():
+        position = string.find(name, VIRTUAL_HOST_SUFFIX)
+        if position != -1:
+            hostname = name[:position]
+            vhost[hostname] = value
+
+
+if __name__ == "__main__":
+    logging.basicConfig(stream=sys.stdout)
+    logging.getLogger(__name__).setLevel(logging.DEBUG if DEBUG else logging.INFO)
+
+    cfg = create_default_cfg(MAXCONN, MODE)
+    vhost = {}
+
     # Tell the user the mode of autoupdate we are using, if any
     if TUTUM_CONTAINER_API_URL:
         if TUTUM_AUTH:
-            logger.info("HAproxy has access to Tutum API - will reload list of backends every %d seconds", POLLING_PERIOD)
+            logger.info("HAproxy has access to Tutum API - will reload list of backends every %d seconds",
+                        POLLING_PERIOD)
         else:
-            logger.warning("HAproxy doesn't have access to Tutum API and it's running in Tutum - you might want to give "
+            logger.warning(
+                "HAproxy doesn't have access to Tutum API and it's running in Tutum - you might want to give "
                 "an API role to this service for automatic backend reconfiguration")
     else:
         logger.info("HAproxy is not running in Tutum")
@@ -233,6 +243,7 @@ if __name__ == "__main__":
                 backend_routes = get_backend_routes(os.environ)
 
             # Update backend routes
+            update_virtualhost(vhost)
             update_cfg(cfg, backend_routes, vhost)
             cfg_text = get_cfg_text(cfg)
 
