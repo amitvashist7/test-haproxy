@@ -99,6 +99,7 @@ def update_cfg(cfg, backend_routes, vhost):
     if SSL:
         frontend.append("redirect scheme https code 301 if !{ ssl_fc }"),
         frontend.append("bind 0.0.0.0:443 %s" % SSL)
+	frontend.append("reqadd X-Forwarded-Proto:\ https")
     if vhost:
         for service_name, domain_name in vhost.iteritems():
             service_name = service_name.upper()
