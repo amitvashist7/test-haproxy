@@ -73,3 +73,12 @@ How to use this container
     Notice that the format of VIRTUAL_HOST is `LINK_ALIAS=DOMAIN`, where LINK_ALIAS must match the link alias.
 
     In the example above, when you access http://www.hello1.com, it will show the service running in container hello1, and http://www.hello2.com will go to container hello2
+
+    *Alternatively*, virtual host can be configured by reading reading linked services environment variables(`VIRTUAL_HOST`). Here is an example:
+    
+    ```
+    docker run -d -e VIRTUAL_HOST=www.hello1.com --name hello1 tutum/hello-world
+    docker run -d -e VIRTUAL_HOST=www.hello2.com --name hello2 tutum/hello-world 
+    docker run -d --link hello1:hello1 --link hello2:hello2 -p 80:80 haproxy
+    ```
+    
