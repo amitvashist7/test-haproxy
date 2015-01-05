@@ -44,8 +44,8 @@ Then, launch the load balancer. To do this, select `Jumpstarts` > `Proxies` and 
 
 That's it - the proxy container will start querying Tutum's API for an updated list of containers in the service and reconfigure itself automatically.
 
-How to use this container
--------------------------
+How to use this HaProxy container
+---------------------------------
 1. My service container(hello) exposes port 8080, I want the HAProxy listens to port 80
 
     Run this container with `--link hello:hello -e PORT=8080 -p 80:80`
@@ -70,7 +70,7 @@ How to use this container
 
     Run this container with `--link hello1:hello1 --link hello2:hello2 -e VIRTUAL_HOST="hello1=www.hello1.com, hello2=www.hello2.com" -p 80:80`
 
-    Notice that the format of VIRTUAL_HOST is `LINK_ALIAS=DOMAIN`, where LINK_ALIAS must match the link alias.
+    Notice that the format of VIRTUAL_HOST is `LINK_ALIAS=DOMAIN`, where LINK_ALIAS must match(startwith) the link alias.
 
     In the example above, when you access http://www.hello1.com, it will show the service running in container hello1, and http://www.hello2.com will go to container hello2
 
@@ -82,3 +82,23 @@ How to use this container
     docker run -d --link hello1:hello1 --link hello2:hello2 -p 80:80 haproxy
     ```
     
+How this Haproxy work
+---------------------
+
+	With Tutum:
+	                                                                  |---- container 1
+	                                           |----- service 1 ----- |---- container 2
+	                                           |   (virtual host 1)   |---- container 3
+	internet --- virtual-host-tutum/haproxy--- |
+	                                           |                      |---- container a
+	                                           |----- service 2 ----- |---- container b
+	                                               (virtual host 2)   |---- container c
+	                                                                     
+	Without Tutum:
+	                                           |---- container 1 (virtual host 1)
+	                                           |---- container 2 (virtual host 1)    
+	                                           |---- container 3 (virtual host 1)
+	internet --- virtual-host-tutum/haproxy--- |
+	                                           |---- container a (virtual host 2)
+	                                           |---- container b (virtual host 2)
+	                                           |---- container c (virtual host 2)                                                                   
