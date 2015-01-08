@@ -6,6 +6,7 @@ import string
 import subprocess
 import sys
 import re
+import socket
 from collections import OrderedDict
 
 import requests
@@ -83,9 +84,8 @@ def get_backend_routes(dict_var):
         if position != -1:
             container_name = name[:position]
             add_port = addr_port_dict.get(container_name, {'addr': "", 'port': ""})
-            if name.endswith(LINK_ADDR_SUFFIX):
-                add_port['addr'] = value
-            elif name.endswith(LINK_PORT_SUFFIX):
+            add_port['addr'] = socket.gethostbyname(container_name.lower())
+            if name.endswith(LINK_PORT_SUFFIX):
                 add_port['port'] = value
             addr_port_dict[container_name] = add_port
 
