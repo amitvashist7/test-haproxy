@@ -1,38 +1,40 @@
 tutum-docker-clusterproxy
 =========================
 
-HAproxy image that balances between linked containers and, if launched in Tutum, 
+HAProxy image that balances between linked containers and, if launched in Tutum, 
 reconfigures itself when a linked cluster member joins or leaves
 
 
 Usage
 -----
 
-Make sure your application container exposes port 80. Then, launch it:
+Launch your application container that exposes port 80:
 
 	docker run -d --name web1 tutum/hello-world
 	docker run -d --name web2 tutum/hello-world
 
-Then, run tutum/haproxy-http linking it to the target containers:
+Then, run `tutum/haproxy` linking it to the target containers:
 
 	docker run -d -p 80:80 --link web1:web1 --link web2:web2 tutum/haproxy
+
+The `tutum/haproxy` container will listen in port 80 and forward requests to both `web1` and `web2` backends using a `roundrobin` algorithm.
 
 
 Configuration
 -------------
 
-You can overwrite the following HAproxy configuration options:
+You can overwrite the following HAProxy configuration options:
 
-* `PORT` (default: `80`): Port HAproxy will bind to, and the port that will forward requests to.
-* `MODE` (default: `http`): Mode of load balancing for HAproxy. Possible values include: `http`, `tcp`, `health`.
+* `PORT` (default: `80`): The port where the web application backends are listening to.
+* `MODE` (default: `http`): Mode of load balancing for HAProxy. Possible values include: `http`, `tcp`, `health`.
 * `BALANCE` (default: `roundrobin`): Load balancing algorithm to use. Possible values include: `roundrobin`, `static-rr`, `source`, `leastconn`.
 * `MAXCONN` (default: `4096`): Sets the maximum per-process number of concurrent connections.
-* `OPTION` (default: `redispatch`): Comma-separated list of HAproxy `option` entries to the `default` section.
-* `TIMEOUT` (default: `connect 5000,client 50000,server 50000`): Comma-separated list of HAproxy `timeout` entries to the `default` section.
-* `SSL_CERT` (default: `**None**`): An optional certificate to use on the binded port. It should have both the private and public keys content. If using it for HTTPS, remember to also set `PORT=443` as the port is not changed by this setting.
+* `OPTION` (default: `redispatch`): Comma-separated list of HAProxy `option` entries to the `default` section.
+* `TIMEOUT` (default: `connect 5000,client 50000,server 50000`): Comma-separated list of HAProxy `timeout` entries to the `default` section.
+* `SSL_CERT` (default: `**None**`): An optional certificate to use on the binded port. It should have both the private and public keys content. If set, port 443 will be used to handle HTTPS requests.
 * `VIRTUAL_HOST` (default: `**None**`): Optional. Let HAProxy route by domain name. Format `LINK_ALIAS=DOMAIN`, comma separated.
 
-Check [the HAproxy configuration manual](http://haproxy.1wt.eu/download/1.4/doc/configuration.txt) for more information on the above.
+Check [the HAProxy configuration manual](http://haproxy.1wt.eu/download/1.4/doc/configuration.txt) for more information on the above.
 
 
 Usage within Tutum
@@ -40,65 +42,107 @@ Usage within Tutum
 
 Launch the service you want to load-balance using Tutum.
 
-Then, launch the load balancer. To do this, select `Jumpstarts` > `Proxies` and select `tutum/haproxy`. During the 3rd step of the wizard, link to the service created earlier, and add "Full Access" API role (this will allow HAproxy to be updated dynamically by querying Tutum's API). 
+Then, launch the load balancer. To do this, select "Jumpstarts", "Proxies" and select `tutum/haproxy`. During the "Environment variables" step of the wizard, link to the service created earlier (the name of the link is not important), and add "Full Access" API role (this will allow HAProxy to be updated dynamically by querying Tutum's API). 
 
 That's it - the proxy container will start querying Tutum's API for an updated list of containers in the service and reconfigure itself automatically.
 
-How to use this HaProxy container
----------------------------------
-1. My service container(hello) exposes port 8080, I want the HAProxy listens to port 80
 
-    Run this container with `--link hello:hello -e PORT=8080 -p 80:80`
+Use case scenarios
+------------------
 
-2. My service container(hello) exposes port 80, I want the HAProxy listens to port 8080
+#### My webapp container exposes port 8080, and I want the proxy to listen in port 80
 
-    Run this container with `--link hello:hello -p 8080:80`
+Use the following:
 
-3. How to use SSL?
+	docker run -d --link webapp:webapp -e PORT=8080 -p 80:80 tutum/haproxy
 
-    Run this container with `-e SSL_CERT="YOUR_CERT_TEXT"`
+#### My webapp container exposes port 80, and I want the proxy to listen in port 8080
 
-    The certificate is a combination of public certificate and private key. Remember to put `\n` between each line of the certificate. To make it simple, suppose your certificate is stored in `~/cert.pem`, you can run this container with `-e SSL_CERT="$(awk 1 ORS='\\n' ~/cert.pem)"`
+Use the following:
 
-4. My service container(hello) exposes port 8080, I want to access it with SSL using HAProxy
+	docker run -d --link webapp:webapp -e PORT=8080 -p 8080:80 tutum/haproxy
 
-    Run this container with `-e SSL_CERT="YOUR_CERT_TEXT" -e PORT=8080 -p 443:443`
+#### I want the proxy to terminate SSL connections and forward plain HTTP requests to my webapp to port 80
 
-    If you also publish port 80, the user accessing port 80 will be redirect to 443 using https
+Use the following:
 
-5. I want to set up virtual host routing by domain
+	docker run -d --link webapp:webapp -p 443:443 -e SSL_CERT="YOUR_CERT_TEXT" tutum/haproxy
 
-    Run this container with `--link hello1:hello1 --link hello2:hello2 -e VIRTUAL_HOST="hello1=www.hello1.com, hello2=www.hello2.com" -p 80:80`
+The certificate in `YOUR_CERT_TEXT` is a combination of public certificate and private key. Remember to put `\n` between each line of the certificate. A way to do this, assuming that your certificate is stored in `~/cert.pem`, is running the following:
 
-    Notice that the format of VIRTUAL_HOST is `LINK_ALIAS=DOMAIN`, where LINK_ALIAS must match(startwith) the link alias.
+	docker run -d --link webapp:webapp -p 80:80 -e SSL_CERT="$(awk 1 ORS='\\n' ~/cert.pem)" tutum/haproxy
 
-    In the example above, when you access http://www.hello1.com, it will show the service running in container hello1, and http://www.hello2.com will go to container hello2
+#### I want the proxy to terminate SSL connections and forward plain HTTP requests to my webapp to port 8080
 
-    *Alternatively*, virtual host can be configured by reading reading linked services environment variables(`VIRTUAL_HOST`). Here is an example:
-    
-    ```
-    docker run -d -e VIRTUAL_HOST=www.hello1.com --name hello1 tutum/hello-world
-    docker run -d -e VIRTUAL_HOST=www.hello2.com --name hello2 tutum/hello-world 
-    docker run -d --link hello1:hello1 --link hello2:hello2 -p 80:80 haproxy
-    ```
-    
-How this Haproxy work
----------------------
+Use the following:
 
-	With Tutum:
-	                                                                  |---- container 1
-	                                           |----- service 1 ----- |---- container 2
-	                                           |   (virtual host 1)   |---- container 3
-	internet --- virtual-host-tutum/haproxy--- |
-	                                           |                      |---- container a
-	                                           |----- service 2 ----- |---- container b
-	                                               (virtual host 2)   |---- container c
-	                                                                     
-	Without Tutum:
-	                                           |---- container 1 (virtual host 1)
-	                                           |---- container 2 (virtual host 1)    
-	                                           |---- container 3 (virtual host 1)
-	internet --- virtual-host-tutum/haproxy--- |
-	                                           |---- container a (virtual host 2)
-	                                           |---- container b (virtual host 2)
-	                                           |---- container c (virtual host 2)                                                                   
+	docker run -d --link webapp:webapp -p 443:443 -e SSL_CERT="YOUR_CERT_TEXT" -e PORT=8080 tutum/haproxy
+
+#### I want to use SSL and redirect non-SSL requests to the SSL endpoint
+
+Use the following:
+
+	docker run -d --link webapp:webapp -p 443:443 -p 80:80 -e SSL_CERT="YOUR_CERT_TEXT" tutum/haproxy
+
+#### I want to set up virtual host routing by domain
+
+There are two ways to configure virtual hosts with this image.
+
+** Method 1: configuring the proxy **
+
+Example:
+
+	docker run -d --name webapp1 tutum/hello-world
+	docker run -d --name webapp2 tutum/hello-world
+	docker run -d --link webapp1:webapp1 --link webapp2:webapp2 -e VIRTUAL_HOST="webapp1=www.webapp1.com, webapp2=www.webapp2.com" -p 80:80 tutum/haproxy
+
+Notice that the format of `VIRTUAL_HOST` is `LINK_ALIAS=DOMAIN`, where `LINK_ALIAS` must match the *beginning* of the link name and `DOMAIN` is the HTTP host that you want the proxy to use to forward requests to that backend.
+
+In the example above, when you access `http://www.webapp1.com`, it will show the service running in container `webapp1`, and `http://www.webapp2.com` will go to container `webapp2`.
+
+If you use the following:
+
+	docker run -d --name webapp1 tutum/hello-world
+	docker run -d --name webapp2-1 tutum/hello-world
+	docker run -d --name webapp2-2 tutum/hello-world
+	docker run -d --link webapp1:webapp1 --link webapp2-1:webapp2-1 --link webapp2-2:webapp2-2 -e VIRTUAL_HOST="webapp1=www.webapp1.com, webapp2=www.webapp2.com" -p 80:80 tutum/haproxy
+
+When you access `http://www.webapp1.com`, it will show the service running in container `webapp1`, and `http://www.webapp2.com` will go to both containers `webapp2-1` and `webapp2-2` using round robin (or whatever is configured in `BALANCE`).
+
+
+** Method 2: configuring the webapp backends **
+
+Alternatively, virtual hosts can be configured by the proxy reading linked container environment variables (`VIRTUAL_HOST`). Here is an example:
+
+    docker run -d -e VIRTUAL_HOST=www.webapp1.com --name webapp1 tutum/hello-world
+    docker run -d -e VIRTUAL_HOST=www.webapp2.com --name webapp2 tutum/hello-world 
+    docker run -d --link webapp1:webapp1 --link webapp2:webapp2 -p 80:80 tutum/haproxy
+
+In the example above, when you access `http://www.webapp1.com`, it will show the service running in container `webapp1`, and `http://www.webapp2.com` will go to container `webapp2`.
+
+_Load balancing between multiple containers of one virtual host is not yet supported with this method._
+
+
+Topologies using virtual hosts
+------------------------------
+
+Within Tutum:
+
+	                                                     |---- container 1
+	                              |----- service 1 ----- |---- container 2
+	                              |   (virtual host 1)   |---- container 3
+	internet --- tutum/haproxy--- |
+	                              |                      |---- container a
+	                              |----- service 2 ----- |---- container b
+	                                  (virtual host 2)   |---- container c
+
+
+Outside Tutum (any Docker server):
+
+	                              |---- container 1 (virtual host 1)
+	                              |---- container 2 (virtual host 1)    
+	                              |---- container 3 (virtual host 1)
+	internet --- tutum/haproxy--- |
+	                              |---- container a (virtual host 2)
+	                              |---- container b (virtual host 2)
+	                              |---- container c (virtual host 2)                                                                   
