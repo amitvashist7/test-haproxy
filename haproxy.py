@@ -191,16 +191,18 @@ def reload_haproxy():
 
 def update_virtualhost(vhost):
     if VIRTUAL_HOST:
+        # vhost specified using environment variables
         for host in VIRTUAL_HOST.split(","):
             tmp = host.split("=", 2)
             if len(tmp) == 2:
                 vhost[tmp[0].strip()] = tmp[1].strip()
-
-    for name, value in os.environ.iteritems():
-        position = string.find(name, VIRTUAL_HOST_SUFFIX)
-        if position != -1:
-            hostname = name[:position]
-            vhost[hostname] = value
+    else:
+        # vhost specified in the linked containers
+        for name, value in os.environ.iteritems():
+            position = string.find(name, VIRTUAL_HOST_SUFFIX)
+            if position != -1 and value != "**None**":
+                hostname = name[:position]
+                vhost[hostname] = value
 
 
 if __name__ == "__main__":
