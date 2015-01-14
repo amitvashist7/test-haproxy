@@ -62,8 +62,9 @@ def create_default_cfg(maxconn, mode):
                    "pidfile /var/run/haproxy.pid",
                    "user haproxy",
                    "group haproxy",
-                   "daemon"],
-        "defaults": ["log     global",
+                   "daemon",
+                   "stats socket /var/run/haproxy.stats level admin"],
+        "defaults": ["log global",
                      "mode %s" % mode]})
     for option in OPTION:
         if option:
