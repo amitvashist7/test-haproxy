@@ -10,12 +10,12 @@ Usage
 
 Launch your application container that exposes port 80:
 
-	docker run -d --name web1 tutum/hello-world
-	docker run -d --name web2 tutum/hello-world
+    docker run -d --name web1 tutum/hello-world
+    docker run -d --name web2 tutum/hello-world
 
 Then, run `tutum/haproxy` linking it to the target containers:
 
-	docker run -d -p 80:80 --link web1:web1 --link web2:web2 tutum/haproxy
+    docker run -d -p 80:80 --link web1:web1 --link web2:web2 tutum/haproxy
 
 The `tutum/haproxy` container will listen in port 80 and forward requests to both `web1` and `web2` backends using a `roundrobin` algorithm.
 
@@ -54,47 +54,47 @@ Use case scenarios
 
 Use the following:
 
-	docker run -d --link webapp:webapp -e PORT=8080 -p 80:80 tutum/haproxy
+    docker run -d --link webapp:webapp -e PORT=8080 -p 80:80 tutum/haproxy
 
 #### My webapp container exposes port 80, and I want the proxy to listen in port 8080
 
 Use the following:
 
-	docker run -d --link webapp:webapp -e PORT=8080 -p 8080:80 tutum/haproxy
+    docker run -d --link webapp:webapp -e PORT=80 -p 8080:80 tutum/haproxy
 
 #### I want the proxy to terminate SSL connections and forward plain HTTP requests to my webapp to port 80
 
 Use the following:
 
-	docker run -d --link webapp:webapp -p 443:443 -e SSL_CERT="YOUR_CERT_TEXT" tutum/haproxy
+    docker run -d --link webapp:webapp -p 443:443 -e SSL_CERT="YOUR_CERT_TEXT" tutum/haproxy
 
 The certificate in `YOUR_CERT_TEXT` is a combination of public certificate and private key. Remember to put `\n` between each line of the certificate. A way to do this, assuming that your certificate is stored in `~/cert.pem`, is running the following:
 
-	docker run -d --link webapp:webapp -p 80:80 -e SSL_CERT="$(awk 1 ORS='\\n' ~/cert.pem)" tutum/haproxy
+    docker run -d --link webapp:webapp -p 443:4443 -e SSL_CERT="$(awk 1 ORS='\\n' ~/cert.pem)" tutum/haproxy
 
 #### I want the proxy to terminate SSL connections and forward plain HTTP requests to my webapp to port 8080
 
 Use the following:
 
-	docker run -d --link webapp:webapp -p 443:443 -e SSL_CERT="YOUR_CERT_TEXT" -e PORT=8080 tutum/haproxy
+    docker run -d --link webapp:webapp -p 443:443 -e SSL_CERT="YOUR_CERT_TEXT" -e PORT=8080 tutum/haproxy
 
 #### I want to use SSL and redirect non-SSL requests to the SSL endpoint
 
 Use the following:
 
-	docker run -d --link webapp:webapp -p 443:443 -p 80:80 -e SSL_CERT="YOUR_CERT_TEXT" tutum/haproxy
+    docker run -d --link webapp:webapp -p 443:443 -p 80:80 -e SSL_CERT="YOUR_CERT_TEXT" tutum/haproxy
 
 #### I want to set up virtual host routing by domain
 
 There are two ways to configure virtual hosts with this image.
 
-** Method 1: configuring the proxy **
+**Method 1: configuring the proxy**
 
 Example:
 
-	docker run -d --name webapp1 tutum/hello-world
-	docker run -d --name webapp2 tutum/hello-world
-	docker run -d --link webapp1:webapp1 --link webapp2:webapp2 -e VIRTUAL_HOST="webapp1=www.webapp1.com, webapp2=www.webapp2.com" -p 80:80 tutum/haproxy
+    docker run -d --name webapp1 tutum/hello-world
+    docker run -d --name webapp2 tutum/hello-world
+    docker run -d --link webapp1:webapp1 --link webapp2:webapp2 -e VIRTUAL_HOST="webapp1=www.webapp1.com, webapp2=www.webapp2.com" -p 80:80 tutum/haproxy
 
 Notice that the format of `VIRTUAL_HOST` is `LINK_ALIAS=DOMAIN`, where `LINK_ALIAS` must match the *beginning* of the link name and `DOMAIN` is the HTTP host that you want the proxy to use to forward requests to that backend.
 
@@ -102,15 +102,15 @@ In the example above, when you access `http://www.webapp1.com`, it will show the
 
 If you use the following:
 
-	docker run -d --name webapp1 tutum/hello-world
-	docker run -d --name webapp2-1 tutum/hello-world
-	docker run -d --name webapp2-2 tutum/hello-world
-	docker run -d --link webapp1:webapp1 --link webapp2-1:webapp2-1 --link webapp2-2:webapp2-2 -e VIRTUAL_HOST="webapp1=www.webapp1.com, webapp2=www.webapp2.com" -p 80:80 tutum/haproxy
+    docker run -d --name webapp1 tutum/hello-world
+    docker run -d --name webapp2-1 tutum/hello-world
+    docker run -d --name webapp2-2 tutum/hello-world
+    docker run -d --link webapp1:webapp1 --link webapp2-1:webapp2-1 --link webapp2-2:webapp2-2 -e VIRTUAL_HOST="webapp1=www.webapp1.com, webapp2=www.webapp2.com" -p 80:80 tutum/haproxy
 
 When you access `http://www.webapp1.com`, it will show the service running in container `webapp1`, and `http://www.webapp2.com` will go to both containers `webapp2-1` and `webapp2-2` using round robin (or whatever is configured in `BALANCE`).
 
 
-** Method 2: configuring the webapp backends **
+**Method 2: configuring the webapp backends**
 
 Alternatively, virtual hosts can be configured by the proxy reading linked container environment variables (`VIRTUAL_HOST`). Here is an example:
 
@@ -120,7 +120,15 @@ Alternatively, virtual hosts can be configured by the proxy reading linked conta
 
 In the example above, when you access `http://www.webapp1.com`, it will show the service running in container `webapp1`, and `http://www.webapp2.com` will go to container `webapp2`.
 
-_Load balancing between multiple containers of one virtual host is not yet supported with this method._
+If you use the following:
+
+    docker run -d -e VIRTUAL_HOST=www.webapp1.com --name webapp1 tutum/hello-world
+    docker run -d -e VIRTUAL_HOST=www.webapp2.com --name webapp2-1 tutum/hello-world
+    docker run -d -e VIRTUAL_HOST=www.webapp2.com --name webapp2-2 tutum/hello-world
+    docker run -d --link webapp1:webapp1 --link webapp2-1:webapp2-1 --link webapp2-2:webapp2-2 -p 80:80 tutum/haproxy
+
+When you access `http://www.webapp1.com`, it will show the service running in container `webapp1`, and `http://www.webapp2.com` will go to both containers `webapp2-1` and `webapp2-2` using round robin (or whatever is configured in `BALANCE`).
+
 
 
 Topologies using virtual hosts
@@ -128,21 +136,21 @@ Topologies using virtual hosts
 
 Within Tutum:
 
-	                                                     |---- container 1
-	                              |----- service 1 ----- |---- container 2
-	                              |   (virtual host 1)   |---- container 3
-	internet --- tutum/haproxy--- |
-	                              |                      |---- container a
-	                              |----- service 2 ----- |---- container b
-	                                  (virtual host 2)   |---- container c
+                                                         |---- container 1
+                                  |----- service 1 ----- |---- container 2
+                                  |   (virtual host 1)   |---- container 3
+    internet --- tutum/haproxy--- |
+                                  |                      |---- container a
+                                  |----- service 2 ----- |---- container b
+                                      (virtual host 2)   |---- container c
 
 
 Outside Tutum (any Docker server):
 
-	                              |---- container 1 (virtual host 1)
-	                              |---- container 2 (virtual host 1)    
-	                              |---- container 3 (virtual host 1)
-	internet --- tutum/haproxy--- |
-	                              |---- container a (virtual host 2)
-	                              |---- container b (virtual host 2)
-	                              |---- container c (virtual host 2)                                                                   
+                                  |---- container 1 (virtual host 1)
+                                  |---- container 2 (virtual host 1)
+                                  |---- container 3 (virtual host 1)
+    internet --- tutum/haproxy--- |
+                                  |---- container a (virtual host 2)
+                                  |---- container b (virtual host 2)
+                                  |---- container c (virtual host 2)
