@@ -102,39 +102,63 @@ def update_cfg(cfg, backend_routes, vhost):
         frontend.append("bind 0.0.0.0:443 %s" % SSL)
         frontend.append("reqadd X-Forwarded-Proto:\ https")
     if vhost:
-        for service_name, domain_name in vhost.iteritems():
-            service_name = service_name.upper()
-            frontend.append("acl host_%s hdr(host) -i %s" % (service_name, domain_name))
-            frontend.append("use_backend %s_cluster if host_%s" % (service_name, service_name))
+        added_vhost = {}
+        for _, domain_name in vhost.iteritems():
+            if not added_vhost.has_key(domain_name):
+                domain_str = domain_name.upper().replace(".", "_")
+                frontend.append("acl host_%s hdr(host) -i %s" % (domain_str, domain_name))
+                frontend.append("use_backend %s_cluster if host_%s" % (domain_str, domain_str))
+                added_vhost[domain_name] = domain_str
     else:
         frontend.append("default_backend default_service")
     cfg["frontend default_frontend"] = frontend
 
     # Set backend
     if vhost:
+        added_vhost = {}
         for service_name, domain_name in vhost.iteritems():
+            domain_str = domain_name.upper().replace(".", "_")
             service_name = service_name.upper()
-            backend = []
-            if SESSION_COOKIE:
-                backend.append("appsession %s len 64 timeout 3h request-learn prefix" % (SESSION_COOKIE, ))
+            if added_vhost.has_key(domain_name):
+                backend = cfg.get("backend %s_cluster" % domain_str, [])
+                for container_name, addr_port in backend_routes.iteritems():
+                    if container_name.startswith(service_name):
+                        server_string = "server %s %s:%s" % (container_name, addr_port["addr"], addr_port["port"])
+                        if SESSION_COOKIE:
+                            server_string += " cookie check"
 
-            backend.append("balance %s" % BALANCE)
-            for container_name, addr_port in backend_routes.iteritems():
-                if container_name.startswith(service_name):
-                    server_string = "server %s %s:%s" % (container_name, addr_port["addr"], addr_port["port"])
-                    if SESSION_COOKIE:
-                        server_string += " cookie check"
+                        # Do not add duplicate backend routes
+                        duplicated = False
+                        for server_str in backend:
+                            if "%s:%s" % (addr_port["addr"], addr_port["port"]) in server_str:
+                                duplicated = True
+                                break
+                        if not duplicated:
+                            backend.append(server_string)
+                cfg["backend %s_cluster" % domain_str] = sorted(backend)
+            else:
+                backend = []
+                if SESSION_COOKIE:
+                    backend.append("appsession %s len 64 timeout 3h request-learn prefix" % (SESSION_COOKIE, ))
 
-                    # Do not add duplicate backend routes
-                    duplicated = False
-                    for server_str in backend:
-                        if "%s:%s" % (addr_port["addr"], addr_port["port"]) in server_str:
-                            duplicated = True
-                            break
-                    if not duplicated:
-                        backend.append(server_string)
+                backend.append("balance %s" % BALANCE)
+                for container_name, addr_port in backend_routes.iteritems():
+                    if container_name.startswith(service_name):
+                        server_string = "server %s %s:%s" % (container_name, addr_port["addr"], addr_port["port"])
+                        if SESSION_COOKIE:
+                            server_string += " cookie check"
+
+                        # Do not add duplicate backend routes
+                        duplicated = False
+                        for server_str in backend:
+                            if "%s:%s" % (addr_port["addr"], addr_port["port"]) in server_str:
+                                duplicated = True
+                                break
+                        if not duplicated:
+                            backend.append(server_string)
             if backend:
-                cfg["backend %s_cluster" % service_name] = sorted(backend)
+                cfg["backend %s_cluster" % domain_name.upper().replace(".", "_")] = sorted(backend)
+                added_vhost[domain_name] = domain_name.upper().replace(".", "_")
 
     else:
         backend = []
