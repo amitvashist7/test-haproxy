@@ -25,7 +25,7 @@ OPTION = os.getenv("OPTION", "redispatch, httplog, dontlognull, forwardfor").spl
 TIMEOUT = os.getenv("TIMEOUT", "connect 5000, client 50000, server 50000").split(",")
 VIRTUAL_HOST = os.getenv("VIRTUAL_HOST", None)
 TUTUM_CONTAINER_API_URL = os.getenv("TUTUM_CONTAINER_API_URL", None)
-POLLING_PERIOD = int(os.getenv("POLLING_PERIOD", 30))
+POLLING_PERIOD = max(int(os.getenv("POLLING_PERIOD", 30)), 5)
 
 TUTUM_AUTH = os.getenv("TUTUM_AUTH")
 DEBUG = os.getenv("DEBUG", False)
