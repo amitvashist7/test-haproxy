@@ -25,6 +25,7 @@ OPTION = os.getenv("OPTION", "redispatch, httplog, dontlognull, forwardfor").spl
 TIMEOUT = os.getenv("TIMEOUT", "connect 5000, client 50000, server 50000").split(",")
 VIRTUAL_HOST = os.getenv("VIRTUAL_HOST", None)
 TUTUM_CONTAINER_API_URL = os.getenv("TUTUM_CONTAINER_API_URL", None)
+POLLING_PERIOD = int(os.getenv("POLLING_PERIOD", 30))
 
 TUTUM_AUTH = os.getenv("TUTUM_AUTH")
 DEBUG = os.getenv("DEBUG", False)
@@ -32,7 +33,6 @@ DEBUG = os.getenv("DEBUG", False)
 # Const var
 CONFIG_FILE = '/etc/haproxy/haproxy.cfg'
 HAPROXY_CMD = ['/usr/sbin/haproxy', '-f', CONFIG_FILE, '-db']
-POLLING_PERIOD = 30
 LINK_ENV_PATTERN = "_PORT_%s_TCP" % PORT
 LINK_ADDR_SUFFIX = LINK_ENV_PATTERN + "_ADDR"
 LINK_PORT_SUFFIX = LINK_ENV_PATTERN + "_PORT"
