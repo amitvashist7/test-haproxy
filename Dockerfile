@@ -24,7 +24,7 @@ ENV BALANCE roundrobin
 ENV MAXCONN 4096
 
 # list of options separated by commas
-ENV OPTION redispatch, httplog, dontlognull
+ENV OPTION redispatch, httplog, dontlognull, forwardfor
 
 # list of timeout entries separated by commas
 ENV TIMEOUT connect 5000, client 50000, server 50000
