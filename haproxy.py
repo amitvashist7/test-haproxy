@@ -214,7 +214,7 @@ def reload_haproxy():
         HAPROXY_CURRENT_SUBPROCESS = process
     else:
         # Launch haproxy
-        logger.info("Lauching haproxy")
+        logger.info("Launching haproxy")
         HAPROXY_CURRENT_SUBPROCESS = subprocess.Popen(HAPROXY_CMD)
 
 
