@@ -15,7 +15,8 @@ import requests
 logger = logging.getLogger(__name__)
 
 # Config ENV
-PORT = os.getenv("PORT", "80")
+BACKEND_PORT = os.getenv("BACKEND_PORT", os.getenv("PORT", "80"))
+FRONTEND_PORT = os.getenv("FRONTEND_PORT", "80")
 MODE = os.getenv("MODE", "http")
 BALANCE = os.getenv("BALANCE", "roundrobin")
 MAXCONN = os.getenv("MAXCONN", "4096")
@@ -33,7 +34,7 @@ DEBUG = os.getenv("DEBUG", False)
 # Const var
 CONFIG_FILE = '/etc/haproxy/haproxy.cfg'
 HAPROXY_CMD = ['/usr/sbin/haproxy', '-f', CONFIG_FILE, '-db']
-LINK_ENV_PATTERN = "_PORT_%s_TCP" % PORT
+LINK_ENV_PATTERN = "_PORT_%s_TCP" % BACKEND_PORT
 LINK_ADDR_SUFFIX = LINK_ENV_PATTERN + "_ADDR"
 LINK_PORT_SUFFIX = LINK_ENV_PATTERN + "_PORT"
 TUTUM_URL_SUFFIX = "_TUTUM_API_URL"
@@ -100,7 +101,7 @@ def update_cfg(cfg, backend_routes, vhost):
     logger.debug("Updating cfg: \n old cfg: %s\n backend_routes: %s\n vhost: %s", cfg, backend_routes, vhost)
     # Set frontend
     frontend = []
-    frontend.append("bind 0.0.0.0:80")
+    frontend.append("bind 0.0.0.0:%s" % FRONTEND_PORT)
     if SSL:
         frontend.append("redirect scheme https code 301 if !{ ssl_fc }"),
         frontend.append("bind 0.0.0.0:443 %s" % SSL)
@@ -267,7 +268,7 @@ if __name__ == "__main__":
                 backend_routes = {}
                 for link in container_details.get("linked_to_container", []):
                     for port, endpoint in link.get("endpoints", {}).iteritems():
-                        if port == "%s/tcp" % PORT:
+                        if port == "%s/tcp" % BACKEND_PORT:
                             backend_routes[link["name"]] = endpoint_match.match(endpoint).groupdict()
             else:
                 # No Tutum API access - configuring backends based on static environment variables
