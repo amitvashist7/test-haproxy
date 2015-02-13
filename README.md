@@ -25,7 +25,8 @@ Configuration
 
 You can overwrite the following HAProxy configuration options:
 
-* `PORT` (default: `80`): The port where the web application backends are listening to.
+* `BACKEND_PORT` (default: `80`): The port where the web application backends are listening to.
+* `FRONTEND_PORT` (default: `80`): The port where the load balancer is listening to.
 * `MODE` (default: `http`): Mode of load balancing for HAProxy. Possible values include: `http`, `tcp`, `health`.
 * `BALANCE` (default: `roundrobin`): Load balancing algorithm to use. Possible values include: `roundrobin`, `static-rr`, `source`, `leastconn`.
 * `MAXCONN` (default: `4096`): Sets the maximum per-process number of concurrent connections.
@@ -54,13 +55,13 @@ Use case scenarios
 
 Use the following:
 
-    docker run -d --link webapp:webapp -e PORT=8080 -p 80:80 tutum/haproxy
+    docker run -d --link webapp:webapp -e BACKEND_PORT=8080 -p 80:80 tutum/haproxy
 
 #### My webapp container exposes port 80, and I want the proxy to listen in port 8080
 
 Use the following:
 
-    docker run -d --link webapp:webapp -e PORT=80 -p 8080:80 tutum/haproxy
+    docker run -d --link webapp:webapp -e FRONTEND_PORT=8080 -p 8080:8080 tutum/haproxy
 
 #### I want the proxy to terminate SSL connections and forward plain HTTP requests to my webapp to port 80
 
@@ -76,7 +77,7 @@ The certificate in `YOUR_CERT_TEXT` is a combination of public certificate and p
 
 Use the following:
 
-    docker run -d --link webapp:webapp -p 443:443 -e SSL_CERT="YOUR_CERT_TEXT" -e PORT=8080 tutum/haproxy
+    docker run -d --link webapp:webapp -p 443:443 -e SSL_CERT="YOUR_CERT_TEXT" -e BACKEND_PORT=8080 tutum/haproxy
 
 #### I want to use SSL and redirect non-SSL requests to the SSL endpoint
 
