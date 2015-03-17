@@ -38,6 +38,9 @@ ENV VIRTUAL_HOST **None**
 # SSL certificate to use (optional)
 ENV SSL_CERT **None**
 
+# SSL bind options to use (optional)
+ENV SSL_BIND_OPTIONS no-sslv3
+
 # Add scripts
 ADD haproxy.py /haproxy.py
 ADD run.sh /run.sh
