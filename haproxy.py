@@ -62,6 +62,7 @@ def create_default_cfg(maxconn, mode):
         "global": ["log 127.0.0.1 local0",
                    "log 127.0.0.1 local1 notice",
                    "maxconn %s" % maxconn,
+                   "tune.ssl.default-dh-param 2048",
                    "pidfile /var/run/haproxy.pid",
                    "user haproxy",
                    "group haproxy",
