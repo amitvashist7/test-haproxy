@@ -26,5 +26,5 @@ test:
     - openssl req -x509 -newkey rsa:2048 -keyout key.pem -out ca.pem -days 1080 -nodes -subj '/CN=localhost/O=My Company Name LTD./C=US'
     - cp key.pem cert.pem
     - cat ca.pem >> cert.pem
-    - docker run -d --link web1:web1 -p 443:443 -e SSL_CERT="$(awk 1 ORS='\\n' cert.pem)" tutum/haproxy
+    - docker run -d --link web1:web1 -p 443:443 -e SSL_CERT="$(awk 1 ORS='\\n' cert.pem)" haproxy
     - curl --retry 10 --retry-delay 5 --cacert ca.pem -L -I https://localhost | grep "200 OK"
