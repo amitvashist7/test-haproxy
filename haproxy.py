@@ -21,6 +21,8 @@ MODE = os.getenv("MODE", "http")
 BALANCE = os.getenv("BALANCE", "roundrobin")
 MAXCONN = os.getenv("MAXCONN", "4096")
 SSL = os.getenv("SSL", "")
+SSL_BIND_OPTIONS = os.getenv("SSL_BIND_OPTIONS", None)
+SSL_BIND_CIPHERS = os.getenv("SSL_BIND_CIPHERS", None)
 SESSION_COOKIE = os.getenv("SESSION_COOKIE")
 OPTION = os.getenv("OPTION", "redispatch, httplog, dontlognull, forwardfor").split(",")
 TIMEOUT = os.getenv("TIMEOUT", "connect 5000, client 50000, server 50000").split(",")
@@ -73,6 +75,10 @@ def create_default_cfg(maxconn, mode):
     for timeout in TIMEOUT:
         if timeout:
             cfg["defaults"].append("timeout %s" % timeout.strip())
+    if SSL_BIND_OPTIONS:
+        cfg["global"].append("ssl-default-bind-options %s" % SSL_BIND_OPTIONS)
+    if SSL_BIND_CIPHERS:
+        cfg["global"].append("ssl-default-bind-ciphers %s" % SSL_BIND_CIPHERS)
 
     return cfg
 
