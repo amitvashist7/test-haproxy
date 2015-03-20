@@ -28,6 +28,7 @@ You can overwrite the following HAProxy configuration options:
 * `BACKEND_PORT` (default: `80`): The port where the web application backends are listening to.
 * `FRONTEND_PORT` (default: `80`): The port where the load balancer is listening to.
 * `MODE` (default: `http`): Mode of load balancing for HAProxy. Possible values include: `http`, `tcp`, `health`.
+* `HDR` (default: `hdr`): "hdr" criteria in acl used in virtualhost. If set to `hdr_end`, for instance, haproxy will match all the subdomains'.
 * `BALANCE` (default: `roundrobin`): Load balancing algorithm to use. Possible values include: `roundrobin`, `static-rr`, `source`, `leastconn`.
 * `MAXCONN` (default: `4096`): Sets the maximum per-process number of concurrent connections.
 * `OPTION` (default: `redispatch`): Comma-separated list of HAProxy `option` entries to the `default` section.
@@ -132,6 +133,10 @@ If you use the following:
 
 When you access `http://www.webapp1.com`, it will show the service running in container `webapp1`, and `http://www.webapp2.com` will go to both containers `webapp2-1` and `webapp2-2` using round robin (or whatever is configured in `BALANCE`).
 
+#### I want all my `*.node.io` domains point to my service
+
+    docker run -d -e VIRTUAL_HOST=node.io --name webapp tutum/hello-world
+    docker run -d --link webapp:webapp -e HDR="hdr_end" -p 80:80 tutum/haproxy
 
 
 Topologies using virtual hosts
