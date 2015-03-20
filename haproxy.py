@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 BACKEND_PORT = os.getenv("BACKEND_PORT", os.getenv("PORT", "80"))
 FRONTEND_PORT = os.getenv("FRONTEND_PORT", "80")
 MODE = os.getenv("MODE", "http")
+HDR = os.getenv("HDR", "hdr")
 BALANCE = os.getenv("BALANCE", "roundrobin")
 MAXCONN = os.getenv("MAXCONN", "4096")
 SSL = os.getenv("SSL", "")
@@ -118,7 +119,7 @@ def update_cfg(cfg, backend_routes, vhost):
         for _, domain_name in vhost.iteritems():
             if not added_vhost.has_key(domain_name):
                 domain_str = domain_name.upper().replace(".", "_")
-                frontend.append("acl host_%s hdr(host) -i %s" % (domain_str, domain_name))
+                frontend.append("acl host_%s %s(host) -i %s" % (domain_str, HDR, domain_name))
                 frontend.append("use_backend %s_cluster if host_%s" % (domain_str, domain_str))
                 added_vhost[domain_name] = domain_str
     else:

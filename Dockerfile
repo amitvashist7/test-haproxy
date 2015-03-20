@@ -20,6 +20,9 @@ ENV FRONTEND_PORT 80
 # MODE of operation (http, tcp)
 ENV MODE http
 
+# HDR is the "hdr" criteria used in "acl" for virtualhost
+ENV HDR hdr
+
 # algorithm for load balancing (roundrobin, source, leastconn, ...)
 ENV BALANCE roundrobin
 
