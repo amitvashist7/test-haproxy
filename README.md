@@ -73,7 +73,7 @@ Use the following:
 
 The certificate in `YOUR_CERT_TEXT` is a combination of public certificate and private key. Remember to put `\n` between each line of the certificate. A way to do this, assuming that your certificate is stored in `~/cert.pem`, is running the following:
 
-    docker run -d --link webapp:webapp -p 443:4443 -e SSL_CERT="$(awk 1 ORS='\\n' ~/cert.pem)" tutum/haproxy
+    docker run -d --link webapp:webapp -p 443:443 -e SSL_CERT="$(awk 1 ORS='\\n' ~/cert.pem)" tutum/haproxy
 
 #### I want the proxy to terminate SSL connections and forward plain HTTP requests to my webapp to port 8080
 
