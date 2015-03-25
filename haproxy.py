@@ -15,7 +15,7 @@ import requests
 logger = logging.getLogger(__name__)
 
 # Config ENV
-BACKEND_PORT = os.getenv("BACKEND_PORT", os.getenv("PORT", "80"))
+BACKEND_PORT = os.getenv("PORT", os.getenv("BACKEND_PORT", "80"))
 FRONTEND_PORT = os.getenv("FRONTEND_PORT", "80")
 MODE = os.getenv("MODE", "http")
 HDR = os.getenv("HDR", "hdr")
