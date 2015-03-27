@@ -97,8 +97,7 @@ def get_backend_routes_tutum(api_url, auth):
     addr_port_dict = {}
     for link in container_details.get("linked_to_container", []):
         for port, endpoint in link.get("endpoints", {}).iteritems():
-            if port == "%s/tcp" % BACKEND_PORT:
-                addr_port_dict[link["name"].upper().replace("-", "_")] = endpoint_match.match(endpoint).groupdict()
+            addr_port_dict[link["name"].upper().replace("-", "_")] = endpoint_match.match(endpoint).groupdict()
 
     return addr_port_dict
 
