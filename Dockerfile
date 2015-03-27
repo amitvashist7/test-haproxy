@@ -11,8 +11,11 @@ RUN echo 'deb http://ppa.launchpad.net/vbernat/haproxy-1.5/ubuntu trusty main' >
     pip install requests==2.2.1 && \
     rm -rf /var/lib/apt/lists/*
 
-# BACKEND_PORT is the port of the app server which is load balanced (also update the EXPOSE directive below)
+# BACKEND_PORT is the port of the app server which is load balanced
 ENV BACKEND_PORT 80
+
+# BACKEND_PORTS is the list of ports of the app server which is load balanced
+ENV BACKEND_PORTS **None**
 
 # FRONTEND_PORT is the port on which the load balancer is accessible (also update the EXPOSE directive below)
 ENV FRONTEND_PORT 80

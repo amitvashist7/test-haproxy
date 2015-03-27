@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 # Config ENV
 BACKEND_PORT = os.getenv("PORT", os.getenv("BACKEND_PORT", "80"))
+BACKEND_PORTS = [x.strip() for x in os.getenv("BACKEND_PORTS", BACKEND_PORT).split(",")]
 FRONTEND_PORT = os.getenv("FRONTEND_PORT", "80")
 MODE = os.getenv("MODE", "http")
 HDR = os.getenv("HDR", "hdr")
@@ -97,7 +98,8 @@ def get_backend_routes_tutum(api_url, auth):
     addr_port_dict = {}
     for link in container_details.get("linked_to_container", []):
         for port, endpoint in link.get("endpoints", {}).iteritems():
-            addr_port_dict[link["name"].upper().replace("-", "_")] = endpoint_match.match(endpoint).groupdict()
+            if port in ["%s/tcp" % x for x in BACKEND_PORTS]:
+                addr_port_dict[link["name"].upper().replace("-", "_")] = endpoint_match.match(endpoint).groupdict()
 
     return addr_port_dict
 

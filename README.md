@@ -26,6 +26,7 @@ Configuration
 You can overwrite the following HAProxy configuration options:
 
 * `BACKEND_PORT` (default: `80`): The port where the web application backends are listening to.
+* `BACKEND_PORTS` (default **None**): The list of ports(comma separated) where the web application backends are listening to.(On works on Tutum at the moment)
 * `FRONTEND_PORT` (default: `80`): The port where the load balancer is listening to.
 * `MODE` (default: `http`): Mode of load balancing for HAProxy. Possible values include: `http`, `tcp`, `health`.
 * `HDR` (default: `hdr`): "hdr" criteria in acl used in virtualhost. If set to `hdr_end`, for instance, haproxy will match all the subdomains'.
