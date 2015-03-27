@@ -85,6 +85,23 @@ def create_default_cfg(maxconn, mode):
     return cfg
 
 
+def get_backend_routes_tutum(api_url, auth):
+    # Return sth like: {'HELLO_WORLD_1': {'proto': 'tcp', 'addr': '172.17.0.103', 'port': '80'},
+    # 'HELLO_WORLD_2': {'proto': 'tcp', 'addr': '172.17.0.95', 'port': '80'}}
+    session = requests.Session()
+    headers = {"Authorization": auth}
+    r = session.get(api_url, headers=headers)
+    r.raise_for_status()
+    container_details = r.json()
+
+    addr_port_dict = {}
+    for link in container_details.get("linked_to_container", []):
+        for port, endpoint in link.get("endpoints", {}).iteritems():
+            addr_port_dict[link["name"].upper().replace("-", "_")] = endpoint_match.match(endpoint).groupdict()
+
+    return addr_port_dict
+
+
 def get_backend_routes(dict_var):
     # Return sth like: {'HELLO_WORLD_1': {'addr': '172.17.0.103', 'port': '80'},
     # 'HELLO_WORLD_2': {'addr': '172.17.0.95', 'port': '80'}}
@@ -260,8 +277,6 @@ if __name__ == "__main__":
                 "an API role to this service for automatic backend reconfiguration")
     else:
         logger.info("HAproxy is not running in Tutum")
-    session = requests.Session()
-    headers = {"Authorization": TUTUM_AUTH}
 
     # Main loop
     old_text = ""
@@ -269,15 +284,7 @@ if __name__ == "__main__":
         try:
             if TUTUM_CONTAINER_API_URL and TUTUM_AUTH:
                 # Running on Tutum with API access - fetch updated list of environment variables
-                r = session.get(TUTUM_CONTAINER_API_URL, headers=headers)
-                r.raise_for_status()
-                container_details = r.json()
-
-                backend_routes = {}
-                for link in container_details.get("linked_to_container", []):
-                    for port, endpoint in link.get("endpoints", {}).iteritems():
-                        if port == "%s/tcp" % BACKEND_PORT:
-                            backend_routes[link["name"]] = endpoint_match.match(endpoint).groupdict()
+                backend_routes = get_backend_routes_tutum(TUTUM_CONTAINER_API_URL, TUTUM_AUTH)
             else:
                 # No Tutum API access - configuring backends based on static environment variables
                 backend_routes = get_backend_routes(os.environ)
