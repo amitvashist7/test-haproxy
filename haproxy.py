@@ -86,8 +86,8 @@ def create_default_cfg(maxconn, mode):
 
 
 def get_backend_routes_tutum(api_url, auth):
-    # Return sth like: {'hello-world-1': {'proto': 'tcp', 'addr': '172.17.0.103', 'port': '80'},
-    # 'hello-world-2': {'proto': 'tcp', 'addr': '172.17.0.95', 'port': '80'}}
+    # Return sth like: {'HELLO_WORLD_1': {'proto': 'tcp', 'addr': '172.17.0.103', 'port': '80'},
+    # 'HELLO_WORLD_2': {'proto': 'tcp', 'addr': '172.17.0.95', 'port': '80'}}
     session = requests.Session()
     headers = {"Authorization": auth}
     r = session.get(api_url, headers=headers)
@@ -98,7 +98,7 @@ def get_backend_routes_tutum(api_url, auth):
     for link in container_details.get("linked_to_container", []):
         for port, endpoint in link.get("endpoints", {}).iteritems():
             if port == "%s/tcp" % BACKEND_PORT:
-                addr_port_dict[link["name"]] = endpoint_match.match(endpoint).groupdict()
+                addr_port_dict[link["name"].upper().replace("-", "_")] = endpoint_match.match(endpoint).groupdict()
 
     return addr_port_dict
 
