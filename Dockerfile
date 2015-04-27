@@ -57,7 +57,7 @@ ENV SSL_CERT **None**
 ENV SSL_BIND_OPTIONS no-sslv3
 
 # Add scripts
-ADD haproxy.py /haproxy.py
+ADD /app /app
 ADD run.sh /run.sh
 RUN chmod +x /*.sh
 

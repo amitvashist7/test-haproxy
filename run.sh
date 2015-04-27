@@ -20,4 +20,4 @@ else
     echo "No SSL certificate provided"
 fi
 
-exec python /haproxy.py 
+exec python /app/haproxy.py 

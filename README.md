@@ -102,11 +102,11 @@ Example:
 
     docker run -d --name webapp1 tutum/hello-world
     docker run -d --name webapp2 tutum/hello-world
-    docker run -d --link webapp1:webapp1 --link webapp2:webapp2 -e VIRTUAL_HOST="webapp1=www.webapp1.com, webapp2=www.webapp2.com" -p 80:80 tutum/haproxy
+    docker run -d --link webapp1:webapp1 --link webapp2:webapp2 -e VIRTUAL_HOST="webapp1=www.webapp1.com, www.webapp1.org, webapp2=www.webapp2.com" -p 80:80 tutum/haproxy
 
 Notice that the format of `VIRTUAL_HOST` is `LINK_ALIAS=DOMAIN`, where `LINK_ALIAS` must match the *beginning* of the link name and `DOMAIN` is the HTTP host that you want the proxy to use to forward requests to that backend.
 
-In the example above, when you access `http://www.webapp1.com`, it will show the service running in container `webapp1`, and `http://www.webapp2.com` will go to container `webapp2`.
+In the example above, when you access `http://www.webapp1.com` or `http://www.webapp1.org`, it will show the service running in container `webapp1`, and `http://www.webapp2.com` will go to container `webapp2`.
 
 If you use the following:
 
@@ -122,11 +122,11 @@ When you access `http://www.webapp1.com`, it will show the service running in co
 
 Alternatively, virtual hosts can be configured by the proxy reading linked container environment variables (`VIRTUAL_HOST`). Here is an example:
 
-    docker run -d -e VIRTUAL_HOST=www.webapp1.com --name webapp1 tutum/hello-world
+    docker run -d -e VIRTUAL_HOST="www.webapp1.com, www.webapp1.org" --name webapp1 tutum/hello-world
     docker run -d -e VIRTUAL_HOST=www.webapp2.com --name webapp2 tutum/hello-world 
     docker run -d --link webapp1:webapp1 --link webapp2:webapp2 -p 80:80 tutum/haproxy
 
-In the example above, when you access `http://www.webapp1.com`, it will show the service running in container `webapp1`, and `http://www.webapp2.com` will go to container `webapp2`.
+In the example above, when you access `http://www.webapp1.com` or `http://www.webapp1.org`, it will show the service running in container `webapp1`, and `http://www.webapp2.com` will go to container `webapp2`.
 
 If you use the following:
 
@@ -144,7 +144,7 @@ When you access `http://www.webapp1.com`, it will show the service running in co
 
 #### I want to send all my logs to papertrailapp
 
-Replace `<subdomain>` and `<port>` with your the values matching your papertrailapp account: 
+Replace `<subdomain>` and `<port>` with your the values matching your papertrailapp account:
 
     docker run -d --name web1 tutum/hello-world
     docker run -d --name web2 tutum/hello-world

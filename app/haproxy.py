@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import logging
 import os
 import time
@@ -10,6 +9,8 @@ import socket
 from collections import OrderedDict
 
 import requests
+
+import utils
 
 
 logger = logging.getLogger(__name__)
@@ -75,15 +76,15 @@ def create_default_cfg(maxconn, mode):
                    "daemon",
                    "stats socket /var/run/haproxy.stats level admin"],
         "listen stats": ["bind *:%s" % STATS_PORT,
-                   "mode http",
-                   "stats enable",
-                   "timeout connect 10s",
-                   "timeout client 1m",
-                   "timeout server 1m",
-                   "stats hide-version",
-                   "stats realm Haproxy\ Statistics",
-                   "stats uri /",
-                   "stats auth %s" % STATS_AUTH],
+                         "mode http",
+                         "stats enable",
+                         "timeout connect 10s",
+                         "timeout client 1m",
+                         "timeout server 1m",
+                         "stats hide-version",
+                         "stats realm Haproxy\ Statistics",
+                         "stats uri /",
+                         "stats auth %s" % STATS_AUTH],
         "defaults": ["log global",
                      "mode %s" % mode]})
     for option in OPTION:
@@ -134,7 +135,6 @@ def get_backend_routes(dict_var):
             if name.endswith(LINK_PORT_SUFFIX):
                 add_port['port'] = value
             addr_port_dict[container_name] = add_port
-
     return addr_port_dict
 
 
@@ -149,11 +149,12 @@ def update_cfg(cfg, backend_routes, vhost):
         frontend.append("bind 0.0.0.0:443 %s" % SSL)
     if vhost:
         added_vhost = {}
-        for _, domain_name in vhost.iteritems():
-            if not added_vhost.has_key(domain_name):
-                domain_str = domain_name.upper().replace(".", "_")
-                frontend.append("acl host_%s %s(host) -i %s" % (domain_str, HDR, domain_name))
-                frontend.append("use_backend %s_cluster if host_%s" % (domain_str, domain_str))
+        for _, domain_names in vhost.iteritems():
+            for domain_name in domain_names:
+                if not added_vhost.has_key(domain_name):
+                    domain_str = domain_name.upper().replace(".", "_")
+                    frontend.append("acl host_%s %s(host) -i %s" % (domain_str, HDR, domain_name))
+                    frontend.append("use_backend %s_cluster if host_%s" % (domain_str, domain_str))
                 added_vhost[domain_name] = domain_str
     else:
         frontend.append("default_backend default_service")
@@ -162,49 +163,50 @@ def update_cfg(cfg, backend_routes, vhost):
     # Set backend
     if vhost:
         added_vhost = {}
-        for service_name, domain_name in vhost.iteritems():
-            domain_str = domain_name.upper().replace(".", "_")
-            service_name = service_name.upper()
-            if added_vhost.has_key(domain_name):
-                backend = cfg.get("backend %s_cluster" % domain_str, [])
-                for container_name, addr_port in backend_routes.iteritems():
-                    if container_name.startswith(service_name):
-                        server_string = "server %s %s:%s" % (container_name, addr_port["addr"], addr_port["port"])
-                        if SESSION_COOKIE:
-                            server_string += " cookie check"
+        for service_name, domain_names in vhost.iteritems():
+            for domain_name in domain_names:
+                domain_str = domain_name.upper().replace(".", "_")
+                service_name = service_name.upper()
+                if added_vhost.has_key(domain_name):
+                    backend = cfg.get("backend %s_cluster" % domain_str, [])
+                    for container_name, addr_port in backend_routes.iteritems():
+                        if container_name.startswith(service_name):
+                            server_string = "server %s %s:%s" % (container_name, addr_port["addr"], addr_port["port"])
+                            if SESSION_COOKIE:
+                                server_string += " cookie check"
 
-                        # Do not add duplicate backend routes
-                        duplicated = False
-                        for server_str in backend:
-                            if "%s:%s" % (addr_port["addr"], addr_port["port"]) in server_str:
-                                duplicated = True
-                                break
-                        if not duplicated:
-                            backend.append(server_string)
-                cfg["backend %s_cluster" % domain_str] = sorted(backend)
-            else:
-                backend = []
-                if SESSION_COOKIE:
-                    backend.append("appsession %s len 64 timeout 3h request-learn prefix" % (SESSION_COOKIE, ))
+                            # Do not add duplicate backend routes
+                            duplicated = False
+                            for server_str in backend:
+                                if "%s:%s" % (addr_port["addr"], addr_port["port"]) in server_str:
+                                    duplicated = True
+                                    break
+                            if not duplicated:
+                                backend.append(server_string)
+                    cfg["backend %s_cluster" % domain_str] = sorted(backend)
+                else:
+                    backend = []
+                    if SESSION_COOKIE:
+                        backend.append("appsession %s len 64 timeout 3h request-learn prefix" % (SESSION_COOKIE, ))
 
-                backend.append("balance %s" % BALANCE)
-                for container_name, addr_port in backend_routes.iteritems():
-                    if container_name.startswith(service_name):
-                        server_string = "server %s %s:%s" % (container_name, addr_port["addr"], addr_port["port"])
-                        if SESSION_COOKIE:
-                            server_string += " cookie check"
+                    backend.append("balance %s" % BALANCE)
+                    for container_name, addr_port in backend_routes.iteritems():
+                        if container_name.startswith(service_name):
+                            server_string = "server %s %s:%s" % (container_name, addr_port["addr"], addr_port["port"])
+                            if SESSION_COOKIE:
+                                server_string += " cookie check"
 
-                        # Do not add duplicate backend routes
-                        duplicated = False
-                        for server_str in backend:
-                            if "%s:%s" % (addr_port["addr"], addr_port["port"]) in server_str:
-                                duplicated = True
-                                break
-                        if not duplicated:
-                            backend.append(server_string)
-            if backend:
-                cfg["backend %s_cluster" % domain_name.upper().replace(".", "_")] = sorted(backend)
-                added_vhost[domain_name] = domain_name.upper().replace(".", "_")
+                            # Do not add duplicate backend routes
+                            duplicated = False
+                            for server_str in backend:
+                                if "%s:%s" % (addr_port["addr"], addr_port["port"]) in server_str:
+                                    duplicated = True
+                                    break
+                            if not duplicated:
+                                backend.append(server_string)
+                if backend:
+                    cfg["backend %s_cluster" % domain_name.upper().replace(".", "_")] = sorted(backend)
+                    added_vhost[domain_name] = domain_name.upper().replace(".", "_")
 
     else:
         backend = []
@@ -259,28 +261,26 @@ def reload_haproxy():
         HAPROXY_CURRENT_SUBPROCESS = subprocess.Popen(HAPROXY_CMD)
 
 
-def update_virtualhost(vhost):
+def parse_vhost():
+    # vhost is something like:
+    # {'web1':['a.com', 'b.com'], 'web2':['c.com']
+    vhost = {}
     if VIRTUAL_HOST:
-        # vhost specified using environment variables
-        for host in VIRTUAL_HOST.split(","):
-            tmp = host.split("=", 2)
-            if len(tmp) == 2:
-                vhost[tmp[0].strip()] = tmp[1].strip()
+        vhost.update(utils.parse_vhost_from_envvar(VIRTUAL_HOST))
     else:
         # vhost specified in the linked containers
         for name, value in os.environ.iteritems():
             position = string.find(name, VIRTUAL_HOST_SUFFIX)
             if position != -1 and value != "**None**":
-                hostname = name[:position]
-                vhost[hostname] = value
+                vhost.update(utils.parse_vhost_from_envvar("%s=%s" % (name[:position], value)))
+    return vhost
 
 
-if __name__ == "__main__":
+def main():
     logging.basicConfig(stream=sys.stdout)
     logging.getLogger(__name__).setLevel(logging.DEBUG if DEBUG else logging.INFO)
 
     cfg = create_default_cfg(MAXCONN, MODE)
-    vhost = {}
 
     # Tell the user the mode of autoupdate we are using, if any
     if TUTUM_CONTAINER_API_URL:
@@ -306,7 +306,7 @@ if __name__ == "__main__":
                 backend_routes = get_backend_routes(os.environ)
 
             # Update backend routes
-            update_virtualhost(vhost)
+            vhost = parse_vhost()
             update_cfg(cfg, backend_routes, vhost)
             cfg_text = get_cfg_text(cfg)
 
@@ -320,3 +320,7 @@ if __name__ == "__main__":
             logger.exception("Error: %s" % e)
 
         time.sleep(POLLING_PERIOD)
+
+
+if __name__ == "__main__":
+    main()
