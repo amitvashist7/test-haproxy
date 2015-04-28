@@ -1,57 +1,18 @@
 import logging
-import os
-import time
 import string
 import subprocess
 import sys
-import re
+import time
 import socket
 from collections import OrderedDict
 
-import requests
+import tutum
 
+from globals import *
 import utils
 
 
 logger = logging.getLogger(__name__)
-
-# Config ENV
-RSYSLOG_DESTINATION = os.getenv("RSYSLOG_DESTINATION", "127.0.0.1")
-BACKEND_PORT = os.getenv("PORT", os.getenv("BACKEND_PORT", "80"))
-BACKEND_PORTS = [x.strip() for x in os.getenv("BACKEND_PORTS", BACKEND_PORT).split(",")]
-FRONTEND_PORT = os.getenv("FRONTEND_PORT", "80")
-MODE = os.getenv("MODE", "http")
-HDR = os.getenv("HDR", "hdr")
-BALANCE = os.getenv("BALANCE", "roundrobin")
-MAXCONN = os.getenv("MAXCONN", "4096")
-SSL = os.getenv("SSL", "")
-SSL_BIND_OPTIONS = os.getenv("SSL_BIND_OPTIONS", None)
-SSL_BIND_CIPHERS = os.getenv("SSL_BIND_CIPHERS", None)
-SESSION_COOKIE = os.getenv("SESSION_COOKIE")
-OPTION = os.getenv("OPTION", "redispatch, httplog, dontlognull, forwardfor").split(",")
-TIMEOUT = os.getenv("TIMEOUT", "connect 5000, client 50000, server 50000").split(",")
-VIRTUAL_HOST = os.getenv("VIRTUAL_HOST", None)
-TUTUM_CONTAINER_API_URL = os.getenv("TUTUM_CONTAINER_API_URL", None)
-POLLING_PERIOD = max(int(os.getenv("POLLING_PERIOD", 30)), 5)
-STATS_PORT = os.getenv("STATS_PORT", "1936")
-STATS_AUTH = os.getenv("STATS_AUTH", "stats:stats")
-
-TUTUM_AUTH = os.getenv("TUTUM_AUTH")
-DEBUG = os.getenv("DEBUG", False)
-
-# Const var
-CONFIG_FILE = '/etc/haproxy/haproxy.cfg'
-HAPROXY_CMD = ['/usr/sbin/haproxy', '-f', CONFIG_FILE, '-db']
-LINK_ENV_PATTERN = "_PORT_%s_TCP" % BACKEND_PORT
-LINK_ADDR_SUFFIX = LINK_ENV_PATTERN + "_ADDR"
-LINK_PORT_SUFFIX = LINK_ENV_PATTERN + "_PORT"
-TUTUM_URL_SUFFIX = "_TUTUM_API_URL"
-VIRTUAL_HOST_SUFFIX = "_ENV_VIRTUAL_HOST"
-
-# Global Var
-HAPROXY_CURRENT_SUBPROCESS = None
-
-endpoint_match = re.compile(r"(?P<proto>tcp|udp):\/\/(?P<addr>[^:]*):(?P<port>.*)")
 
 
 def get_cfg_text(cfg):
@@ -101,26 +62,23 @@ def create_default_cfg(maxconn, mode):
     return cfg
 
 
-def get_backend_routes_tutum(api_url, auth):
-    # Return sth like: {'HELLO_WORLD_1': {'proto': 'tcp', 'addr': '172.17.0.103', 'port': '80'},
+def get_backend_routes_tutum(uuid):
+    # Output: {'HELLO_WORLD_1': {'proto': 'tcp', 'addr': '172.17.0.103', 'port': '80'},
     # 'HELLO_WORLD_2': {'proto': 'tcp', 'addr': '172.17.0.95', 'port': '80'}}
-    session = requests.Session()
-    headers = {"Authorization": auth}
-    r = session.get(api_url, headers=headers)
-    r.raise_for_status()
-    container_details = r.json()
-
     addr_port_dict = {}
-    for link in container_details.get("linked_to_container", []):
-        for port, endpoint in link.get("endpoints", {}).iteritems():
-            if port in ["%s/tcp" % x for x in BACKEND_PORTS]:
-                addr_port_dict[link["name"].upper().replace("-", "_")] = endpoint_match.match(endpoint).groupdict()
-
+    try:
+        container = tutum.Container.fetch(uuid)
+        for link in container.linked_to_container:
+            for port, endpoint in link.get("endpoints", {}).iteritems():
+                if port in ["%s/tcp" % x for x in BACKEND_PORTS]:
+                    addr_port_dict[link["name"].upper().replace("-", "_")] = ENDPOINT_MATCH.match(endpoint).groupdict()
+    except Exception as e:
+        logger.error("Cannot get backend route from Tutum:", e)
     return addr_port_dict
 
 
 def get_backend_routes(dict_var):
-    # Return sth like: {'HELLO_WORLD_1': {'addr': '172.17.0.103', 'port': '80'},
+    # Output: {'HELLO_WORLD_1': {'addr': '172.17.0.103', 'port': '80'},
     # 'HELLO_WORLD_2': {'addr': '172.17.0.95', 'port': '80'}}
     addr_port_dict = {}
     for name, value in dict_var.iteritems():
@@ -261,32 +219,48 @@ def reload_haproxy():
         HAPROXY_CURRENT_SUBPROCESS = subprocess.Popen(HAPROXY_CMD)
 
 
-def parse_vhost():
-    # vhost is something like:
-    # {'web1':['a.com', 'b.com'], 'web2':['c.com']
-    vhost = {}
-    if VIRTUAL_HOST:
-        vhost.update(utils.parse_vhost_from_envvar(VIRTUAL_HOST))
-    else:
-        # vhost specified in the linked containers
-        for name, value in os.environ.iteritems():
-            position = string.find(name, VIRTUAL_HOST_SUFFIX)
-            if position != -1 and value != "**None**":
-                vhost.update(utils.parse_vhost_from_envvar("%s=%s" % (name[:position], value)))
-    return vhost
+def run_haproxy():
+    cfg = create_default_cfg(MAXCONN, MODE)
+    vhost = utils.parse_vhost(VIRTUAL_HOST, os.environ.iteritems())
+    backend_routes = get_backend_routes(os.environ)
+    update_cfg(cfg, backend_routes, vhost)
+    cfg_text = get_cfg_text(cfg)
+    logger.info("HAProxy configuration:\n%s" % cfg_text)
+    save_config_file(cfg_text, CONFIG_FILE)
+
+    logger.info("Launching haproxy")
+    p = subprocess.Popen(HAPROXY_CMD)
+    p.wait()
+
+
+def run_haproxy_tutum():
+    cfg = create_default_cfg(MAXCONN, MODE)
+    vhost = utils.parse_vhost(VIRTUAL_HOST, os.environ.iteritems())
+    backend_routes = get_backend_routes_tutum(HAPROXY_CONTAINER_UUID)
+    update_cfg(cfg, backend_routes, vhost)
+    cfg_text = get_cfg_text(cfg)
+    logger.info("HAProxy configuration:\n%s" % cfg_text)
+    save_config_file(cfg_text, CONFIG_FILE)
+    reload_haproxy()
+
+
+def tutum_event_handler(event):
+    if event.get("state", "").lower() == "success":
+        pass
+    if event.get("state", "").lower() == "success" and \
+                    event.get("action", "").lower() == "update" and \
+                    len(set(LINKED_SERVICES_ENDPOINTS).intersection(set(event.get("parents", [])))) > 0:
+        run_haproxy_tutum()
 
 
 def main():
     logging.basicConfig(stream=sys.stdout)
     logging.getLogger(__name__).setLevel(logging.DEBUG if DEBUG else logging.INFO)
 
-    cfg = create_default_cfg(MAXCONN, MODE)
-
     # Tell the user the mode of autoupdate we are using, if any
-    if TUTUM_CONTAINER_API_URL:
+    if TUTUM_SERVICE_API_URL and TUTUM_CONTAINER_API_URL:
         if TUTUM_AUTH:
-            logger.info("HAproxy has access to Tutum API - will reload list of backends every %d seconds",
-                        POLLING_PERIOD)
+            logger.info("HAproxy has access to Tutum API - will reload list of backends in real-time")
         else:
             logger.warning(
                 "HAproxy doesn't have access to Tutum API and it's running in Tutum - you might want to give "
@@ -294,32 +268,18 @@ def main():
     else:
         logger.info("HAproxy is not running in Tutum")
 
-    # Main loop
-    old_text = ""
-    while True:
-        try:
-            if TUTUM_CONTAINER_API_URL and TUTUM_AUTH:
-                # Running on Tutum with API access - fetch updated list of environment variables
-                backend_routes = get_backend_routes_tutum(TUTUM_CONTAINER_API_URL, TUTUM_AUTH)
-            else:
-                # No Tutum API access - configuring backends based on static environment variables
-                backend_routes = get_backend_routes(os.environ)
-
-            # Update backend routes
-            vhost = parse_vhost()
-            update_cfg(cfg, backend_routes, vhost)
-            cfg_text = get_cfg_text(cfg)
-
-            # If cfg changes, write to file
-            if old_text != cfg_text:
-                logger.info("HAProxy configuration has been changed:\n%s" % cfg_text)
-                save_config_file(cfg_text, CONFIG_FILE)
-                reload_haproxy()
-                old_text = cfg_text
-        except Exception as e:
-            logger.exception("Error: %s" % e)
-
-        time.sleep(POLLING_PERIOD)
+    if TUTUM_SERVICE_API_URL and TUTUM_AUTH:
+        global LINKED_SERVICES_ENDPOINTS, HAPROXY_CONTAINER_UUID
+        LINKED_SERVICES_ENDPOINTS = utils.parse_tutum_service_endpoint(os.environ.iteritems())
+        HAPROXY_CONTAINER_UUID = utils.parse_uuid_from_url(TUTUM_CONTAINER_API_URL)
+        run_haproxy_tutum()
+        events = tutum.TutumEvents()
+        events.on_message(tutum_event_handler)
+        events.run_forever()
+    else:
+        while True:
+            run_haproxy()
+            time.sleep(1)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ RUN echo 'deb http://ppa.launchpad.net/vbernat/haproxy-1.5/ubuntu trusty main' >
     apt-get update && \
     apt-get install -y --no-install-recommends haproxy python-pip && \
     apt-get clean && \
-    pip install requests==2.2.1 && \
+    pip install python-tutum && \
     rm -rf /var/lib/apt/lists/*
 
 # the rsyslog destination to where haproxy logs are sent
