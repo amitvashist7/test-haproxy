@@ -2,7 +2,8 @@ import socket
 import string
 import re
 
-from constants import LINK_ENV_PATTERN, LINK_PORT_SUFFIX, BACKEND_PORTS, VIRTUAL_HOST_SUFFIX, TUTUM_ENDPOINT_PREFIX
+from constants import LINK_ENV_PATTERN, LINK_ADDR_SUFFIX, LINK_PORT_SUFFIX, BACKEND_PORTS, \
+    VIRTUAL_HOST_SUFFIX, TUTUM_ENDPOINT_PREFIX
 
 
 ENDPOINT_MATCH = re.compile(r"(?P<proto>tcp|udp):\/\/(?P<addr>[^:]*):(?P<port>.*)")
@@ -21,8 +22,9 @@ def parse_vhost_from_envvar(envvars):
             domain = tmp[1].strip()
             domain_list = vhost.get(container_name, [])
             domain_list.append(domain)
-            vhost[container_name] = domain_list
-        if tmp_len == 1:
+            if container_name:
+                vhost[container_name] = domain_list
+        if tmp_len == 1 and container_name:
             domain = tmp[0].strip()
             domain_list = vhost.get(container_name, [])
             domain_list.append(domain)
@@ -37,8 +39,8 @@ def parse_vhost(virtualhost, envvars):
     vhost = {}
     if virtualhost:
         vhost.update(parse_vhost_from_envvar(virtualhost))
-    else:
-        # vhost specified in the linked containers
+    if not vhost:
+        # try to parse vhost specified in the linked containers
         for name, value in envvars.iteritems():
             position = string.find(name, VIRTUAL_HOST_SUFFIX)
             if position != -1 and value != "**None**":
@@ -78,14 +80,18 @@ def parse_backend_routes(dict_var):
         position = string.find(name, LINK_ENV_PATTERN)
         if position != -1:
             container_name = name[:position]
-            add_port = addr_port_dict.get(container_name, {'addr': "", 'port': ""})
+            addr_port = addr_port_dict.get(container_name, {'addr': "", 'port': ""})
             try:
-                add_port['addr'] = socket.gethostbyname(container_name.lower())
+                addr_port['addr'] = socket.gethostbyname(container_name.lower())
             except socket.gaierror:
-                add_port['addr'] = socket.gethostbyname(container_name.lower().replace("_", "-"))
+                try:
+                    addr_port['addr'] = socket.gethostbyname(container_name.lower().replace("_", "-"))
+                except socket.gaierror:
+                    if name.endswith(LINK_ADDR_SUFFIX):
+                        addr_port['addr'] = value
             if name.endswith(LINK_PORT_SUFFIX):
-                add_port['port'] = value
-            addr_port_dict[container_name] = add_port
+                addr_port['port'] = value
+            addr_port_dict[container_name] = addr_port
     return addr_port_dict
 
 
