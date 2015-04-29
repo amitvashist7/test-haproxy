@@ -1,4 +1,5 @@
 *.py[cod]
+app/test_haproxy.py
 
 # C extensions
 *.so

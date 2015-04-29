@@ -1,16 +1,23 @@
 import logging
-import string
 import subprocess
 import sys
 import time
-import socket
 from collections import OrderedDict
 
 import tutum
 
-from globals import *
+from constants import *
 import utils
 
+
+
+# Global Var
+HAPROXY_CURRENT_SUBPROCESS = None
+LINKED_SERVICES_ENDPOINTS = None
+HAPROXY_ENDPOINT = None
+HAPROXY_CONTAINER_UUID = None
+HAPROXY_SERVICE_UUID = None
+PREVIOUS_CFG_TEXT = None
 
 logger = logging.getLogger(__name__)
 
@@ -62,40 +69,6 @@ def create_default_cfg(maxconn, mode):
     return cfg
 
 
-def get_backend_routes_tutum(uuid):
-    # Output: {'HELLO_WORLD_1': {'proto': 'tcp', 'addr': '172.17.0.103', 'port': '80'},
-    # 'HELLO_WORLD_2': {'proto': 'tcp', 'addr': '172.17.0.95', 'port': '80'}}
-    addr_port_dict = {}
-    try:
-        container = tutum.Container.fetch(uuid)
-        for link in container.linked_to_container:
-            for port, endpoint in link.get("endpoints", {}).iteritems():
-                if port in ["%s/tcp" % x for x in BACKEND_PORTS]:
-                    addr_port_dict[link["name"].upper().replace("-", "_")] = ENDPOINT_MATCH.match(endpoint).groupdict()
-    except Exception as e:
-        logger.error("Cannot get backend route from Tutum:", e)
-    return addr_port_dict
-
-
-def get_backend_routes(dict_var):
-    # Output: {'HELLO_WORLD_1': {'addr': '172.17.0.103', 'port': '80'},
-    # 'HELLO_WORLD_2': {'addr': '172.17.0.95', 'port': '80'}}
-    addr_port_dict = {}
-    for name, value in dict_var.iteritems():
-        position = string.find(name, LINK_ENV_PATTERN)
-        if position != -1:
-            container_name = name[:position]
-            add_port = addr_port_dict.get(container_name, {'addr': "", 'port': ""})
-            try:
-                add_port['addr'] = socket.gethostbyname(container_name.lower())
-            except socket.gaierror:
-                add_port['addr'] = socket.gethostbyname(container_name.lower().replace("_", "-"))
-            if name.endswith(LINK_PORT_SUFFIX):
-                add_port['port'] = value
-            addr_port_dict[container_name] = add_port
-    return addr_port_dict
-
-
 def update_cfg(cfg, backend_routes, vhost):
     logger.debug("Updating cfg: \n old cfg: %s\n backend_routes: %s\n vhost: %s", cfg, backend_routes, vhost)
     # Set frontend
@@ -106,26 +79,26 @@ def update_cfg(cfg, backend_routes, vhost):
         frontend.append("redirect scheme https code 301 if !{ ssl_fc }"),
         frontend.append("bind 0.0.0.0:443 %s" % SSL)
     if vhost:
-        added_vhost = {}
+        added_vhost = set()
         for _, domain_names in vhost.iteritems():
             for domain_name in domain_names:
-                if not added_vhost.has_key(domain_name):
+                if domain_name not in added_vhost:
                     domain_str = domain_name.upper().replace(".", "_")
                     frontend.append("acl host_%s %s(host) -i %s" % (domain_str, HDR, domain_name))
                     frontend.append("use_backend %s_cluster if host_%s" % (domain_str, domain_str))
-                added_vhost[domain_name] = domain_str
+                added_vhost.add(domain_name)
     else:
         frontend.append("default_backend default_service")
     cfg["frontend default_frontend"] = frontend
 
     # Set backend
     if vhost:
-        added_vhost = {}
+        added_vhost = set()
         for service_name, domain_names in vhost.iteritems():
             for domain_name in domain_names:
                 domain_str = domain_name.upper().replace(".", "_")
                 service_name = service_name.upper()
-                if added_vhost.has_key(domain_name):
+                if domain_name in added_vhost:
                     backend = cfg.get("backend %s_cluster" % domain_str, [])
                     for container_name, addr_port in backend_routes.iteritems():
                         if container_name.startswith(service_name):
@@ -164,7 +137,7 @@ def update_cfg(cfg, backend_routes, vhost):
                                 backend.append(server_string)
                 if backend:
                     cfg["backend %s_cluster" % domain_name.upper().replace(".", "_")] = sorted(backend)
-                    added_vhost[domain_name] = domain_name.upper().replace(".", "_")
+                    added_vhost.add(domain_name)
 
     else:
         backend = []
@@ -209,48 +182,71 @@ def reload_haproxy():
     global HAPROXY_CURRENT_SUBPROCESS
     if HAPROXY_CURRENT_SUBPROCESS:
         # Reload haproxy
-        logger.info("Reloading haproxy")
+        logger.info("Reloading HAProxy")
         process = subprocess.Popen(HAPROXY_CMD + ["-sf", str(HAPROXY_CURRENT_SUBPROCESS.pid)])
         HAPROXY_CURRENT_SUBPROCESS.wait()
         HAPROXY_CURRENT_SUBPROCESS = process
+        logger.info("HAProxy reloaded")
     else:
         # Launch haproxy
-        logger.info("Launching haproxy")
+        logger.info("Launching HAProxy")
         HAPROXY_CURRENT_SUBPROCESS = subprocess.Popen(HAPROXY_CMD)
 
 
 def run_haproxy():
     cfg = create_default_cfg(MAXCONN, MODE)
-    vhost = utils.parse_vhost(VIRTUAL_HOST, os.environ.iteritems())
-    backend_routes = get_backend_routes(os.environ)
+    vhost = utils.parse_vhost(VIRTUAL_HOST, os.environ)
+    backend_routes = utils.parse_backend_routes(os.environ)
     update_cfg(cfg, backend_routes, vhost)
     cfg_text = get_cfg_text(cfg)
     logger.info("HAProxy configuration:\n%s" % cfg_text)
     save_config_file(cfg_text, CONFIG_FILE)
 
-    logger.info("Launching haproxy")
+    logger.info("Launching HAProxy")
     p = subprocess.Popen(HAPROXY_CMD)
     p.wait()
 
 
-def run_haproxy_tutum():
+def run_haproxy_tutum(container_uuid):
+    global PREVIOUS_CFG_TEXT
+    while True:
+        try:
+            container = tutum.Container.fetch(container_uuid)
+            break
+        except Exception as e:
+            logging.error(e)
+            time.sleep(API_ERROR_RETRY_TIME)
     cfg = create_default_cfg(MAXCONN, MODE)
-    vhost = utils.parse_vhost(VIRTUAL_HOST, os.environ.iteritems())
-    backend_routes = get_backend_routes_tutum(HAPROXY_CONTAINER_UUID)
+    backend_routes = utils.parse_backend_routes_tutum(container.linked_to_container)
+    envvars = {}
+    for pair in container.container_envvars:
+        envvars[pair['key']]= pair['value']
+    vhost = utils.parse_vhost(VIRTUAL_HOST, envvars)
     update_cfg(cfg, backend_routes, vhost)
     cfg_text = get_cfg_text(cfg)
-    logger.info("HAProxy configuration:\n%s" % cfg_text)
-    save_config_file(cfg_text, CONFIG_FILE)
-    reload_haproxy()
+    if PREVIOUS_CFG_TEXT != cfg_text:
+        logger.info("HAProxy configuration:\n%s" % cfg_text)
+        save_config_file(cfg_text, CONFIG_FILE)
+        PREVIOUS_CFG_TEXT = cfg_text
+        reload_haproxy()
 
 
 def tutum_event_handler(event):
-    if event.get("state", "").lower() == "success":
-        pass
+    global LINKED_SERVICES_ENDPOINTS
     if event.get("state", "").lower() == "success" and \
-                    event.get("action", "").lower() == "update" and \
-                    len(set(LINKED_SERVICES_ENDPOINTS).intersection(set(event.get("parents", [])))) > 0:
-        run_haproxy_tutum()
+                    event.get("action", "").lower() == "update":
+        if len(set(LINKED_SERVICES_ENDPOINTS).intersection(set(event.get("parents", [])))) > 0:
+            run_haproxy_tutum(HAPROXY_CONTAINER_UUID)
+        if HAPROXY_ENDPOINT in event.get("parents", []):
+            while True:
+                try:
+                    service = tutum.Service.fetch(HAPROXY_SERVICE_UUID)
+                    break
+                except Exception as e:
+                    logging.error(e)
+                    time.sleep(API_ERROR_RETRY_TIME)
+            LINKED_SERVICES_ENDPOINTS = [srv.get("to_service") for srv in service.linked_to_service]
+            run_haproxy_tutum(HAPROXY_CONTAINER_UUID)
 
 
 def main():
@@ -260,19 +256,30 @@ def main():
     # Tell the user the mode of autoupdate we are using, if any
     if TUTUM_SERVICE_API_URL and TUTUM_CONTAINER_API_URL:
         if TUTUM_AUTH:
-            logger.info("HAproxy has access to Tutum API - will reload list of backends in real-time")
+            logger.info("HAProxy has access to Tutum API - will reload list of backends in real-time")
         else:
             logger.warning(
-                "HAproxy doesn't have access to Tutum API and it's running in Tutum - you might want to give "
+                "HAProxy doesn't have access to Tutum API and it's running in Tutum - you might want to give "
                 "an API role to this service for automatic backend reconfiguration")
     else:
-        logger.info("HAproxy is not running in Tutum")
+        logger.info("HAProxy is not running in Tutum")
 
     if TUTUM_SERVICE_API_URL and TUTUM_AUTH:
-        global LINKED_SERVICES_ENDPOINTS, HAPROXY_CONTAINER_UUID
-        LINKED_SERVICES_ENDPOINTS = utils.parse_tutum_service_endpoint(os.environ.iteritems())
+        global HAPROXY_CONTAINER_UUID, HAPROXY_SERVICE_UUID, HAPROXY_ENDPOINT, LINKED_SERVICES_ENDPOINTS
         HAPROXY_CONTAINER_UUID = utils.parse_uuid_from_url(TUTUM_CONTAINER_API_URL)
-        run_haproxy_tutum()
+        HAPROXY_SERVICE_UUID = utils.parse_uuid_from_url(TUTUM_SERVICE_API_URL)
+        HAPROXY_ENDPOINT = utils.parse_endpoint_from_url(TUTUM_SERVICE_API_URL)
+
+        while True:
+            try:
+                service = tutum.Service.fetch(HAPROXY_SERVICE_UUID)
+                break
+            except Exception as e:
+                logging.error(e)
+                time.sleep(API_ERROR_RETRY_TIME)
+        LINKED_SERVICES_ENDPOINTS = [srv.get("to_service") for srv in service.linked_to_service]
+
+        run_haproxy_tutum(HAPROXY_CONTAINER_UUID)
         events = tutum.TutumEvents()
         events.on_message(tutum_event_handler)
         events.run_forever()
