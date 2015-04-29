@@ -127,14 +127,19 @@ def get_backend_routes(dict_var):
         position = string.find(name, LINK_ENV_PATTERN)
         if position != -1:
             container_name = name[:position]
-            add_port = addr_port_dict.get(container_name, {'addr': "", 'port': ""})
+            addr_port = addr_port_dict.get(container_name, {'addr': "", 'port': ""})
             try:
-                add_port['addr'] = socket.gethostbyname(container_name.lower())
+                addr_port['addr'] = socket.gethostbyname(container_name.lower())
             except socket.gaierror:
-                add_port['addr'] = socket.gethostbyname(container_name.lower().replace("_", "-"))
+                try:
+                    addr_port['addr'] = socket.gethostbyname(container_name.lower().replace("_", "-"))
+                except socket.gaierror:
+                    if name.endswith(LINK_ADDR_SUFFIX):
+                        logger.warning("Cannot resolve %s, use the value in environment variable instead" % container_name)
+                        addr_port['addr'] = value
             if name.endswith(LINK_PORT_SUFFIX):
-                add_port['port'] = value
-            addr_port_dict[container_name] = add_port
+                addr_port['port'] = value
+            addr_port_dict[container_name] = addr_port
     return addr_port_dict
 
 
@@ -267,8 +272,8 @@ def parse_vhost():
     vhost = {}
     if VIRTUAL_HOST:
         vhost.update(utils.parse_vhost_from_envvar(VIRTUAL_HOST))
-    else:
-        # vhost specified in the linked containers
+    if not vhost:
+        # try to parse vhost specified in the linked containers
         for name, value in os.environ.iteritems():
             position = string.find(name, VIRTUAL_HOST_SUFFIX)
             if position != -1 and value != "**None**":

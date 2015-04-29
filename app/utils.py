@@ -11,8 +11,9 @@ def parse_vhost_from_envvar(envvars):
             domain = tmp[1].strip()
             domain_list = vhost.get(container_name, [])
             domain_list.append(domain)
-            vhost[container_name] = domain_list
-        if tmp_len == 1:
+            if container_name:
+                vhost[container_name] = domain_list
+        if tmp_len == 1 and container_name:
             domain = tmp[0].strip()
             domain_list = vhost.get(container_name, [])
             domain_list.append(domain)
