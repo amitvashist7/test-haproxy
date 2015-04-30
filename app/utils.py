@@ -11,7 +11,7 @@ ENDPOINT_MATCH = re.compile(r"(?P<proto>tcp|udp):\/\/(?P<addr>[^:]*):(?P<port>.*
 
 def parse_vhost_from_envvar(envvars):
     # Input:  "web1=a.com, b.com, web=c.com"
-    # Output: {'web1':['a.com', 'b.com'], 'web2':['c.com']
+    # Output: {'web1':['a.com', 'b.com'], 'web2':['c.com']}
     vhost = {}
     container_name = None
     for term in envvars.split(','):
@@ -34,7 +34,7 @@ def parse_vhost_from_envvar(envvars):
 
 def parse_vhost(virtualhost, envvars):
     # Input:  virtualhost - None or "web1=a.com, b.com, web=c.com"
-    # envvars     - {'WEB_1_ENV_VIRTUAL_HOST':'a.com', 'b.com', 'WEB_2_ENV_VIRTUAL_HOST':'c.com'}
+    #         envvars     - {'WEB_1_ENV_VIRTUAL_HOST':'a.com', 'b.com', 'WEB_2_ENV_VIRTUAL_HOST':'c.com'}
     # Output: {'web1':['a.com', 'b.com'], 'web2':['c.com']
     vhost = {}
     if virtualhost:
@@ -70,9 +70,9 @@ def parse_endpoint_from_url(url):
 
 def parse_backend_routes(dict_var):
     # Input:  {'HELLO_2_PORT_80_TCP_ADDR': '10.7.0.5}
-    # 'HELLO_1_PORT_80_TCP_ADDR': '10.7.0.3}
-    # 'HELLO_2_PORT_80_TCP_PORT': '80'
-    # 'HELLO_2_PORT_80_TCP_PORT': '80'}
+    #          'HELLO_1_PORT_80_TCP_ADDR': '10.7.0.3}
+    #          'HELLO_2_PORT_80_TCP_PORT': '80'
+    #          'HELLO_2_PORT_80_TCP_PORT': '80'}
     # Output: {'HELLO_1': {'addr': '172.17.0.103', 'port': '80'},
     #          'HELLO_2': {'addr': '172.17.0.95', 'port': '80'}}
     addr_port_dict = {}
@@ -97,10 +97,10 @@ def parse_backend_routes(dict_var):
 
 def parse_backend_routes_tutum(container_links):
     # Input:  [{"endpoints": {"80/tcp": "tcp://10.7.0.3:80"},
-    # "name": "hello-1",
+    #           "name": "hello-1",
     #           "from_container": "/api/v1/container/702d18d4-7934-4715-aea3-c0637f1a4129/",
-    #           "to_container": "/api/v1/container/60b850b7-593e-461b-9b61-5fe1f5a681aa/"
-    #          },
+    #          "to_container": "/api/v1/container/60b850b7-593e-461b-9b61-5fe1f5a681aa/"
+    #           },
     #          {"endpoints": {"80/tcp": "tcp://10.7.0.5:80"},
     #           "name": "hello-2",
     #           "from_container": "/api/v1/container/702d18d4-7934-4715-aea3-c0637f1a4129/",
@@ -120,3 +120,4 @@ def parse_backend_routes_tutum(container_links):
                 if container_name:
                     routes[container_name] = parse_backend_routes_tutum.endpoint_match.match(endpoint).groupdict()
     return routes
+
