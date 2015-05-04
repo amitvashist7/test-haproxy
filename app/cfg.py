@@ -76,7 +76,6 @@ def cfg_backend(backend_routes, vhost):
         for service_name, domain_names in vhost.iteritems():
             for domain_name in domain_names:
                 domain_str = domain_name.upper().replace(".", "_")
-                service_name = service_name.upper()
                 if domain_name in added_vhost:
                     backend = cfg.get("backend %s_cluster" % domain_str, [])
                     for container_name, addr_port in backend_routes.iteritems():

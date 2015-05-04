@@ -65,10 +65,10 @@ def run_tutum(container_uuid):
     backend_routes = utils.parse_backend_routes_tutum(container.linked_to_container)
 
     cfg = cfg_calc(backend_routes, vhost)
-    cfg_text = utils.cfg_to_text(cfg)
+    cfg_text = cfg_to_text(cfg)
     if PREVIOUS_CFG_TEXT != cfg_text:
         logger.info("HAProxy configuration:\n%s" % cfg_text)
-        utils.save_configuration(cfg_text, CONFIG_FILE)
+        cfg_save(cfg_text, CONFIG_FILE)
         PREVIOUS_CFG_TEXT = cfg_text
         HAPROXY_CURRENT_SUBPROCESS = reload_haproxy(HAPROXY_CURRENT_SUBPROCESS)
 
@@ -76,7 +76,7 @@ def run_tutum(container_uuid):
 def tutum_event_handler(event):
     global LINKED_SERVICES_ENDPOINTS
     if event.get("state", "").lower() == "success" and \
-                    event.get("action", "").lower() == "update":
+            event.get("action", "").lower() == "update":
         if len(set(LINKED_SERVICES_ENDPOINTS).intersection(set(event.get("parents", [])))) > 0:
             run_tutum(HAPROXY_CONTAINER_UUID)
         if HAPROXY_ENDPOINT in event.get("parents", []):

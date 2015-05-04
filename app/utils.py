@@ -11,14 +11,14 @@ ENDPOINT_MATCH = re.compile(r"(?P<proto>tcp|udp):\/\/(?P<addr>[^:]*):(?P<port>.*
 
 def parse_vhost_from_envvar(envvars):
     # Input:  "web1=a.com, b.com, web=c.com"
-    # Output: {'web1':['a.com', 'b.com'], 'web2':['c.com']}
+    # Output: {'WEB1':['a.com', 'b.com'], 'WEB2':['c.com']}
     vhost = {}
     container_name = None
     for term in envvars.split(','):
         tmp = term.strip().split("=", 2)
         tmp_len = len(tmp)
         if tmp_len == 2:
-            container_name = tmp[0].strip()
+            container_name = tmp[0].strip().replace("-", "_").upper()
             domain = tmp[1].strip()
             domain_list = vhost.get(container_name, [])
             domain_list.append(domain)
