@@ -13,9 +13,6 @@ import utils
 # Global Var
 HAPROXY_CURRENT_SUBPROCESS = None
 LINKED_SERVICES_ENDPOINTS = None
-HAPROXY_ENDPOINT = None
-HAPROXY_CONTAINER_UUID = None
-HAPROXY_SERVICE_UUID = None
 PREVIOUS_CFG_TEXT = None
 
 logger = logging.getLogger("tutum_haproxy")
@@ -48,15 +45,20 @@ def run():
     p.wait()
 
 
-def run_tutum(container_uuid):
-    global PREVIOUS_CFG_TEXT, HAPROXY_CURRENT_SUBPROCESS
+def fetch_tutum_obj(uri):
     while True:
         try:
-            container = tutum.Container.fetch(container_uuid)
+            obj = tutum.Utils.fetch_by_resource_uri(uri)
             break
         except Exception as e:
             logging.error(e)
             time.sleep(API_ERROR_RETRY_TIME)
+    return obj
+
+
+def run_tutum(container_uri):
+    global PREVIOUS_CFG_TEXT, HAPROXY_CURRENT_SUBPROCESS
+    container = fetch_tutum_obj(container_uri)
 
     envvars = {}
     for pair in container.container_envvars:
@@ -78,31 +80,16 @@ def tutum_event_handler(event):
     if event.get("state", "").lower() == "success" and \
             event.get("action", "").lower() == "update":
         if len(set(LINKED_SERVICES_ENDPOINTS).intersection(set(event.get("parents", [])))) > 0:
-            run_tutum(HAPROXY_CONTAINER_UUID)
-        if HAPROXY_ENDPOINT in event.get("parents", []):
-            while True:
-                try:
-                    service = tutum.Service.fetch(HAPROXY_SERVICE_UUID)
-                    break
-                except Exception as e:
-                    logging.error(e)
-                    time.sleep(API_ERROR_RETRY_TIME)
+            run_tutum(TUTUM_CONTAINER_API_URI)
+        if TUTUM_SERVICE_API_URI in event.get("parents", []):
+            service = fetch_tutum_obj(TUTUM_SERVICE_API_URI)
             LINKED_SERVICES_ENDPOINTS = [srv.get("to_service") for srv in service.linked_to_service]
-            run_tutum(HAPROXY_CONTAINER_UUID)
+            run_tutum(TUTUM_CONTAINER_API_URI)
 
 
 def init_tutum_settings():
-    global HAPROXY_CONTAINER_UUID, HAPROXY_SERVICE_UUID, HAPROXY_ENDPOINT, LINKED_SERVICES_ENDPOINTS
-    HAPROXY_CONTAINER_UUID = utils.parse_uuid_from_url(TUTUM_CONTAINER_API_URL)
-    HAPROXY_SERVICE_UUID = utils.parse_uuid_from_url(TUTUM_SERVICE_API_URL)
-    HAPROXY_ENDPOINT = utils.parse_endpoint_from_url(TUTUM_SERVICE_API_URL)
-    while True:
-        try:
-            service = tutum.Service.fetch(HAPROXY_SERVICE_UUID)
-            break
-        except Exception as e:
-            logging.error(e)
-            time.sleep(API_ERROR_RETRY_TIME)
+    global LINKED_SERVICES_ENDPOINTS
+    service = fetch_tutum_obj(TUTUM_SERVICE_API_URI)
     LINKED_SERVICES_ENDPOINTS = [srv.get("to_service") for srv in service.linked_to_service]
 
 
@@ -111,7 +98,7 @@ def main():
     logging.getLogger("tutum_haproxy").setLevel(logging.DEBUG if DEBUG else logging.INFO)
 
     # Tell the user the mode of autoupdate we are using, if any
-    if TUTUM_SERVICE_API_URL and TUTUM_CONTAINER_API_URL:
+    if TUTUM_SERVICE_API_URI and TUTUM_CONTAINER_API_URI:
         if TUTUM_AUTH:
             logger.info("HAProxy has access to Tutum API - will reload list of backends in real-time")
         else:
@@ -121,9 +108,9 @@ def main():
     else:
         logger.info("HAProxy is not running in Tutum")
 
-    if TUTUM_SERVICE_API_URL and TUTUM_CONTAINER_API_URL and TUTUM_AUTH:
+    if TUTUM_SERVICE_API_URI and TUTUM_CONTAINER_API_URI and TUTUM_AUTH:
         init_tutum_settings()
-        run_tutum(HAPROXY_CONTAINER_UUID)
+        run_tutum(TUTUM_CONTAINER_API_URI)
         events = tutum.TutumEvents()
         events.on_message(tutum_event_handler)
         events.run_forever()

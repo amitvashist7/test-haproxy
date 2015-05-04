@@ -2,8 +2,7 @@ import socket
 import string
 import re
 
-from constants import LINK_ENV_PATTERN, LINK_ADDR_SUFFIX, LINK_PORT_SUFFIX, BACKEND_PORTS, \
-    VIRTUAL_HOST_SUFFIX, TUTUM_ENDPOINT_PREFIX
+from constants import LINK_ENV_PATTERN, LINK_ADDR_SUFFIX, LINK_PORT_SUFFIX, BACKEND_PORTS, VIRTUAL_HOST_SUFFIX
 
 
 ENDPOINT_MATCH = re.compile(r"(?P<proto>tcp|udp):\/\/(?P<addr>[^:]*):(?P<port>.*)")
@@ -46,26 +45,6 @@ def parse_vhost(virtualhost, envvars):
             if position != -1 and value != "**None**":
                 vhost.update(parse_vhost_from_envvar("%s=%s" % (name[:position], value)))
     return vhost
-
-
-def parse_uuid_from_url(url):
-    # Input:  https://dashboard.tutum.co/api/v1/container/f04588e5-9388-4718-b932-cd98815cc0d5/
-    # Output: f04588e5-9388-4718-b932-cd98815cc0d5
-    if url:
-        terms = url.strip().strip("/").split("/")
-        if len(terms) > 0:
-            return terms[-1]
-    return None
-
-
-def parse_endpoint_from_url(url):
-    # Input:  https://dashboard.tutum.co/api/v1/container/f04588e5-9388-4718-b932-cd98815cc0d5/
-    # Output: /api/v1/container/f04588e5-9388-4718-b932-cd98815cc0d5/
-    endpoint = ""
-    position = string.find(url, TUTUM_ENDPOINT_PREFIX)
-    if position != -1:
-        endpoint = url[position:]
-    return endpoint
 
 
 def parse_backend_routes(dict_var):
