@@ -2,5 +2,10 @@ machine:
   services:
     - docker
 test:
+  pre:
+    - pyenv global 2.7.6
+    - sudo pip install tutum
   override:
     - make test
+  post:
+    - tutum service terminate $(tutum service ps -q) || true
