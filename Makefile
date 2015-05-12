@@ -94,7 +94,7 @@ push-image: build
 
 clean-tutum-service:
 	@echo "==> Terminating containers in Tuttum"
-	tutum service terminate --sync $(services) || true
+	tutum service terminate $(services) || true
 	@echo
 
 test-with-tutum:push-image clean-tutum-service
@@ -152,6 +152,34 @@ test-with-tutum:push-image clean-tutum-service
 	grep 'My hostname is $(random)web-g-2' output | wc -l | grep 1
 	@echo
 
+	@echo "==> Testing container stop"
+	tutum container stop --sync $(random)web-f-1
+	tutum container stop --sync $(random)web-g-1
+	rm -f output
+	sleep 5
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	grep 'My hostname is $(random)web-f-2' output | wc -l | grep 2
+	grep 'My hostname is $(random)web-g-2' output | wc -l | grep 2
+	@echo
+
+	@echo "==> Testing container start"
+	tutum container start --sync $(random)web-f-1
+	tutum container start --sync $(random)web-g-1
+	rm -f output
+	sleep 5
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	grep 'My hostname is $(random)web-f-1' output | wc -l | grep 1
+	grep 'My hostname is $(random)web-f-2' output | wc -l | grep 1
+	grep 'My hostname is $(random)web-g-1' output | wc -l | grep 1
+	grep 'My hostname is $(random)web-g-2' output | wc -l | grep 1
+	@echo
+
 	@echo "==> Testing with scale down"
 	tutum service scale --sync $(random)web-f 1
 	tutum service scale --sync $(random)web-g 1
@@ -163,6 +191,7 @@ test-with-tutum:push-image clean-tutum-service
 	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
 	grep 'My hostname is $(random)web-f-1' output | wc -l | grep 2
 	grep 'My hostname is $(random)web-g-1' output | wc -l | grep 2
+	@echo
 
 test-unittest:build
 	@echo "====== Running unit test ======"

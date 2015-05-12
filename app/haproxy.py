@@ -77,13 +77,18 @@ def run_tutum(container_uri):
 
 def tutum_event_handler(event):
     global LINKED_SERVICES_ENDPOINTS
-    if event.get("state", "").lower() == "success" and \
-            event.get("action", "").lower() == "update":
-        if len(set(LINKED_SERVICES_ENDPOINTS).intersection(set(event.get("parents", [])))) > 0:
-            run_tutum(TUTUM_CONTAINER_API_URI)
-        if TUTUM_SERVICE_API_URI in event.get("parents", []):
-            service = fetch_tutum_obj(TUTUM_SERVICE_API_URI)
-            LINKED_SERVICES_ENDPOINTS = [srv.get("to_service") for srv in service.linked_to_service]
+    # When service scale up/down or container start/stop/terminate/redeploy, reload the service
+    if event.get("state", "") not in ["In progress", "Pending", "Terminating", "Starting", "Scaling", "Stopping"] and \
+                    event.get("action", "").lower() == "update" and \
+                    len(set(LINKED_SERVICES_ENDPOINTS).intersection(set(event.get("parents", [])))) > 0:
+        run_tutum(TUTUM_CONTAINER_API_URI)
+
+    # Add/remove services linked to haproxy
+    if event.get("state", "") == "Success" and TUTUM_SERVICE_API_URI in event.get("parents", []):
+        service = fetch_tutum_obj(TUTUM_SERVICE_API_URI)
+        service_endpoints = [srv.get("to_service") for srv in service.linked_to_service]
+        if LINKED_SERVICES_ENDPOINTS != service_endpoints:
+            LINKED_SERVICES_ENDPOINTS = service_endpoints
             run_tutum(TUTUM_CONTAINER_API_URI)
 
 
