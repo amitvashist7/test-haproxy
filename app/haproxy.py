@@ -24,7 +24,7 @@ def reload_haproxy(haproxy_process):
         logger.info("Reloading HAProxy")
         process = subprocess.Popen(HAPROXY_CMD + ["-sf", str(haproxy_process.pid)])
         haproxy_process.wait()
-        logger.info("HAProxy reloaded")
+        logger.info("HAProxy has been reloaded")
         return process
     else:
         # Launch haproxy

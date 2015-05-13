@@ -26,7 +26,7 @@ DEBUG = os.getenv("DEBUG", False)
 
 # Const var
 CONFIG_FILE = '/etc/haproxy/haproxy.cfg'
-HAPROXY_CMD = ['/usr/sbin/haproxy', '-f', CONFIG_FILE, '-db']
+HAPROXY_CMD = ['/usr/sbin/haproxy', '-f', CONFIG_FILE, '-db', '-q']
 LINK_ENV_PATTERN = "_PORT_%s_TCP" % BACKEND_PORT
 LINK_ADDR_SUFFIX = LINK_ENV_PATTERN + "_ADDR"
 LINK_PORT_SUFFIX = LINK_ENV_PATTERN + "_PORT"
