@@ -1,33 +1,11 @@
 machine:
   services:
     - docker
-dependencies:
-  override:
-    - openssl req -x509 -newkey rsa:2048 -keyout key.pem -out ca.pem -days 1080 -nodes -subj '/CN=localhost/O=My Company Name LTD./C=US'
-    - cp key.pem cert.pem
-    - cat ca.pem >> cert.pem
-    - docker build -t lb .
-    - docker run -d --name web_a -e HOSTNAME="web_a" tutum/hello-world
-    - docker run -d --name web_b -e HOSTNAME="web_b" tutum/hello-world
-    - docker run -d --name web_c -e HOSTNAME=web_c -e VIRTUAL_HOST=web_c.org tutum/hello-world
-    - docker run -d --name web_d -e HOSTNAME=web_d -e VIRTUAL_HOST="web_d.org, test.org" tutum/hello-world
 test:
+  pre:
+    - pyenv global 2.7.6
+    - sudo pip install tutum
   override:
-    - docker run -d --link web_a:web_a --link web_b:web_b -p 8000:80 lb; sleep 3
-    - curl --retry 10 --retry-delay 5 -L -I http://localhost:8000 | grep "200 OK"
-    # test virtual host method 1
-    - docker run -d --link web_a:web_a --link web_b:web_b -e VIRTUAL_HOST=" web_a = www.web_a.org, www.test.org, web_b = www.web_b.org " -p 8001:80 lb; sleep 3
-    - "curl -H 'Host:www.web_a.org' 127.0.0.1:8001 | grep 'My hostname is web_a'"
-    - "curl -H 'Host:www.test.org' 127.0.0.1:8001 | grep 'My hostname is web_a'"
-    - "curl -H 'Host:www.web_b.org' 127.0.0.1:8001 | grep 'My hostname is web_b'"
-    # test virtual host method 2
-    - docker run -d --link web_c:web_c --link web_d:web_d -p 8002:80 lb; sleep 3
-    - "curl -H 'Host:web_c.org' 127.0.0.1:8002 | grep 'My hostname is web_c'"
-    - "curl -H 'Host:test.org' 127.0.0.1:8002 | grep 'My hostname is web_d'"
-    - "curl -H 'Host:web_d.org' 127.0.0.1:8002 | grep 'My hostname is web_d'"
-    # test https
-    - docker run -d --link web_a:web_a -e SSL_CERT="$(awk 1 ORS='\\n' cert.pem)" -p 443:443  lb; sleep 3
-    - curl --retry 10 --retry-delay 5 --cacert ca.pem -L -I https://localhost | grep "200 OK"
-    # test HDR=hdr_end (wildcard sub-domains on virtual host)
-    - docker run -d --link web_c:web_c -e HDR="hdr_end" -p 8003:80 lb
-    - curl -H "www.web_c.org" localhost:8003
+    - make test
+  post:
+    - tutum service terminate $(tutum service ps -q) || true

@@ -1,7 +1,9 @@
 tutum-docker-clusterproxy
 =========================
 
-HAProxy image that balances between linked containers and, if launched in Tutum, 
+[![Deploy to Tutum](https://s.tutum.co/deploy-to-tutum.svg)](https://dashboard.tutum.co/stack/deploy/)
+
+HAProxy image that balances between linked containers and, if launched in Tutum,
 reconfigures itself when a linked cluster member joins or leaves
 
 
@@ -26,7 +28,7 @@ Configuration
 You can overwrite the following HAProxy configuration options:
 
 * `BACKEND_PORT` (default: `80`): The port where the web application backends are listening to.
-* `BACKEND_PORTS` (default **None**): The list of ports(comma separated) where the web application backends are listening to.(On works on Tutum at the moment)
+* `BACKEND_PORTS` (default **None**): The list of ports(comma separated) where the web application backends are listening to.(Only works on Tutum at the moment)
 * `FRONTEND_PORT` (default: `80`): The port where the load balancer is listening to.
 * `MODE` (default: `http`): Mode of load balancing for HAProxy. Possible values include: `http`, `tcp`, `health`.
 * `HDR` (default: `hdr`): "hdr" criteria in acl used in virtualhost. If set to `hdr_end`, for instance, haproxy will match all the subdomains'.
@@ -50,7 +52,7 @@ Usage within Tutum
 
 Launch the service you want to load-balance using Tutum.
 
-Then, launch the load balancer. To do this, select "Jumpstarts", "Proxies" and select `tutum/haproxy`. During the "Environment variables" step of the wizard, link to the service created earlier (the name of the link is not important), and add "Full Access" API role (this will allow HAProxy to be updated dynamically by querying Tutum's API). 
+Then, launch the load balancer. To do this, select "Jumpstarts", "Proxies" and select `tutum/haproxy`. During the "Environment variables" step of the wizard, link to the service created earlier (the name of the link is not important), and add "Full Access" API role (this will allow HAProxy to be updated dynamically by querying Tutum's API).
 
 That's it - the proxy container will start querying Tutum's API for an updated list of containers in the service and reconfigure itself automatically.
 
@@ -123,7 +125,7 @@ When you access `http://www.webapp1.com`, it will show the service running in co
 Alternatively, virtual hosts can be configured by the proxy reading linked container environment variables (`VIRTUAL_HOST`). Here is an example:
 
     docker run -d -e VIRTUAL_HOST="www.webapp1.com, www.webapp1.org" --name webapp1 tutum/hello-world
-    docker run -d -e VIRTUAL_HOST=www.webapp2.com --name webapp2 tutum/hello-world 
+    docker run -d -e VIRTUAL_HOST=www.webapp2.com --name webapp2 tutum/hello-world
     docker run -d --link webapp1:webapp1 --link webapp2:webapp2 -p 80:80 tutum/haproxy
 
 In the example above, when you access `http://www.webapp1.com` or `http://www.webapp1.org`, it will show the service running in container `webapp1`, and `http://www.webapp2.com` will go to container `webapp2`.

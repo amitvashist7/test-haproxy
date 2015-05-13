@@ -1,0 +1,11 @@
+lb:
+  image: tutum/haproxy
+  links:
+    - "web:web"
+  ports:
+    - 80:80
+  roles:
+    - global
+web:
+  image: tutum/hello-world
+  target_num_containers: 2
