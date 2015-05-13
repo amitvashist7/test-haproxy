@@ -133,26 +133,11 @@ test-with-tutum:push-image clean-tutum-service
 	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:www.web-c.org' $(NODE_FQDN):8003 | grep 'My hostname is web-c'
 	@echo
 
-	@echo "==> Testing with scale up"
-	tutum service run --sync --name $(random)web-f -e VIRTUAL_HOST=web-f.org tutum/hello-world
-	tutum service run --sync --name $(random)web-g -e VIRTUAL_HOST=web-g.org tutum/hello-world
+	@echo "==> Testing container stop"
+	tutum service run -t 2 --sync --name $(random)web-f -e VIRTUAL_HOST=web-f.org tutum/hello-world
+	tutum service run -t 2 --sync --name $(random)web-g -e VIRTUAL_HOST=web-g.org tutum/hello-world
 	tutum service run --role global --name $(random)lb5 --link $(random)web-f:$(random)web-f --link $(random)web-g:$(random)web-g -p 8004:80 tifayuki/haproxy-test
 	wget --spider --retry-connrefused --no-check-certificate -q -T 5 $(NODE_FQDN):8004 || true
-	tutum service scale --sync $(random)web-f 2
-	tutum service scale --sync $(random)web-g 2
-	rm -f output
-	sleep 5
-	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
-	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
-	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
-	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
-	grep 'My hostname is $(random)web-f-1' output | wc -l | grep 1
-	grep 'My hostname is $(random)web-f-2' output | wc -l | grep 1
-	grep 'My hostname is $(random)web-g-1' output | wc -l | grep 1
-	grep 'My hostname is $(random)web-g-2' output | wc -l | grep 1
-	@echo
-
-	@echo "==> Testing container stop"
 	tutum container stop --sync $(random)web-f-1
 	tutum container stop --sync $(random)web-g-1
 	rm -f output
@@ -180,7 +165,48 @@ test-with-tutum:push-image clean-tutum-service
 	grep 'My hostname is $(random)web-g-2' output | wc -l | grep 1
 	@echo
 
-	@echo "==> Testing with scale down"
+	@echo "==> Testing container terminate"
+	tutum container terminate --sync $(random)web-f-2
+	tutum container terminate --sync $(random)web-g-2
+	rm -f output
+	sleep 5
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	grep 'My hostname is $(random)web-f-1' output | wc -l | grep 2
+	grep 'My hostname is $(random)web-g-1' output | wc -l | grep 2
+	@echo
+
+	@echo "==> Testing container redeploy"
+	tutum container redeploy --sync $(random)web-f-1
+	tutum container redeploy --sync $(random)web-g-1
+	rm -f output
+	sleep 5
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	grep 'My hostname is $(random)web-f-1' output | wc -l | grep 2
+	grep 'My hostname is $(random)web-g-1' output | wc -l | grep 2
+	@echo
+
+	@echo "==> Testing with service scale up"
+	tutum service scale --sync $(random)web-f 2
+	tutum service scale --sync $(random)web-g 2
+	rm -f output
+	sleep 5
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	grep 'My hostname is $(random)web-f-1' output | wc -l | grep 1
+	grep 'My hostname is $(random)web-f-2' output | wc -l | grep 1
+	grep 'My hostname is $(random)web-g-1' output | wc -l | grep 1
+	grep 'My hostname is $(random)web-g-2' output | wc -l | grep 1
+	@echo
+
+	@echo "==> Testing with service scale down"
 	tutum service scale --sync $(random)web-f 1
 	tutum service scale --sync $(random)web-g 1
 	rm -f output
@@ -191,6 +217,54 @@ test-with-tutum:push-image clean-tutum-service
 	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
 	grep 'My hostname is $(random)web-f-1' output | wc -l | grep 2
 	grep 'My hostname is $(random)web-g-1' output | wc -l | grep 2
+	@echo
+
+	@echo "==> Testing with service stop"
+	tutum service stop --sync $(random)web-g
+	rm -f output
+	sleep 5
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl -sL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	curl -sL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	grep 'My hostname is $(random)web-f-1' output | wc -l | grep 2
+	grep '503 Service Unavailable' output | wc -l | grep 2
+	@echo
+
+	@echo "==> Testing with service start"
+	tutum service start --sync $(random)web-g
+	rm -f output
+	sleep 5
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	grep 'My hostname is $(random)web-f-1' output | wc -l | grep 2
+	grep 'My hostname is $(random)web-g-1' output | wc -l | grep 2
+	@echo
+
+	@echo "==> Testing with service terminate"
+	tutum service terminate --sync $(random)web-g
+	rm -f output
+	sleep 5
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl -sL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	curl -sL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	grep 'My hostname is $(random)web-f-1' output | wc -l | grep 2
+	grep '503 Service Unavailable' output | wc -l | grep 2
+	@echo
+
+	@echo "==> Testing with service redeploy"
+	tutum service redeploy --sync $(random)web-f
+	rm -f output
+	sleep 5
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:web-f.org' $(NODE_FQDN):8004 >> output
+	curl -sL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	curl -sL -H 'Host:web-g.org' $(NODE_FQDN):8004 >> output
+	grep 'My hostname is $(random)web-f-1' output | wc -l | grep 2
+	grep '503 Service Unavailable' output | wc -l | grep 2
 	@echo
 
 test-unittest:build
