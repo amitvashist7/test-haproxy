@@ -29,7 +29,7 @@ You can overwrite the following HAProxy configuration options:
 
 * `BACKEND_PORT` (default: `80`): The port where the web application backends are listening to.
 * `BACKEND_PORTS` (default **None**): The list of ports(comma separated) where the web application backends are listening to.(Only works on Tutum at the moment)
-* `FRONTEND_PORT` (default: `80`): The port where the load balancer is listening to.
+* `FRONTEND_PORT` (default: `80`): The port where the load balancer is listening to. (To use SSL, please do not change it to `443`, `SSL_CERT` envvar will handle the port)
 * `MODE` (default: `http`): Mode of load balancing for HAProxy. Possible values include: `http`, `tcp`, `health`.
 * `HDR` (default: `hdr`): "hdr" criteria in acl used in virtualhost. If set to `hdr_end`, for instance, haproxy will match all the subdomains'.
 * `BALANCE` (default: `roundrobin`): Load balancing algorithm to use. Possible values include: `roundrobin`, `static-rr`, `source`, `leastconn`.
@@ -71,6 +71,8 @@ Use the following:
 Use the following:
 
     docker run -d --link webapp:webapp -e FRONTEND_PORT=8080 -p 8080:8080 tutum/haproxy
+    
+**Notice**: Please do not change `FRONTEND_PORT` to `443` when using SSL. Setting `SSL_CERT` is all you need to do
 
 #### I want the proxy to terminate SSL connections and forward plain HTTP requests to my webapp to port 80
 
