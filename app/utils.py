@@ -100,3 +100,9 @@ def parse_backend_routes_tutum(container_links):
                     routes[container_name] = parse_backend_routes_tutum.endpoint_match.match(endpoint).groupdict()
     return routes
 
+
+def parse_uuid_from_resource_uri(uri):
+    terms = uri.strip("/").split("/")
+    if len(terms) < 2:
+        return ""
+    return terms[-1]
