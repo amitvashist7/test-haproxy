@@ -4,10 +4,10 @@ import sys
 import time
 
 import tutum
-
 from cfg import cfg_calc, cfg_save, cfg_to_text
 from constants import *
 import utils
+
 
 
 # Global Var
@@ -24,11 +24,11 @@ def reload_haproxy(haproxy_process):
         logger.info("Reloading HAProxy")
         process = subprocess.Popen(HAPROXY_CMD + ["-sf", str(haproxy_process.pid)])
         haproxy_process.wait()
-        logger.info("HAProxy has been reloaded")
+        logger.info("HAProxy has been reloaded\n******************************")
         return process
     else:
         # Launch haproxy
-        logger.info("Launching HAProxy")
+        logger.info("Launching HAProxy\n******************************")
         return subprocess.Popen(HAPROXY_CMD)
 
 
@@ -58,6 +58,7 @@ def fetch_tutum_obj(uri):
 
 def run_tutum(container_uri):
     global PREVIOUS_CFG_TEXT, HAPROXY_CURRENT_SUBPROCESS
+    logger.info("Fetching HAProxy container details through REST Api")
     container = fetch_tutum_obj(container_uri)
 
     envvars = {}
@@ -69,18 +70,22 @@ def run_tutum(container_uri):
     cfg = cfg_calc(backend_routes, vhost)
     cfg_text = cfg_to_text(cfg)
     if PREVIOUS_CFG_TEXT != cfg_text:
-        logger.info("HAProxy configuration:\n%s" % cfg_text)
+        logger.info("HAProxy configuration is updated:\n%s" % cfg_text)
         cfg_save(cfg_text, CONFIG_FILE)
         PREVIOUS_CFG_TEXT = cfg_text
         HAPROXY_CURRENT_SUBPROCESS = reload_haproxy(HAPROXY_CURRENT_SUBPROCESS)
+    else:
+        logger.info("HAProxy configuration remains unchanged")
 
 
 def tutum_event_handler(event):
     global LINKED_SERVICES_ENDPOINTS
     # When service scale up/down or container start/stop/terminate/redeploy, reload the service
     if event.get("state", "") not in ["In progress", "Pending", "Terminating", "Starting", "Scaling", "Stopping"] and \
-                    event.get("action", "").lower() == "update" and \
+                    event.get("type", "").lower() in ["container", "service"] and \
                     len(set(LINKED_SERVICES_ENDPOINTS).intersection(set(event.get("parents", [])))) > 0:
+        logger.info("Tutum even detected: %s %s is %s" %
+                    (event["type"], utils.parse_uuid_from_resource_uri(event.get("resource_uri", "")), event["state"]))
         run_tutum(TUTUM_CONTAINER_API_URI)
 
     # Add/remove services linked to haproxy
@@ -89,6 +94,7 @@ def tutum_event_handler(event):
         service_endpoints = [srv.get("to_service") for srv in service.linked_to_service]
         if LINKED_SERVICES_ENDPOINTS != service_endpoints:
             LINKED_SERVICES_ENDPOINTS = service_endpoints
+            logger.info("Service linked to HAProxy container is changed")
             run_tutum(TUTUM_CONTAINER_API_URI)
 
 

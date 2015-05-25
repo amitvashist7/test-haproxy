@@ -4,7 +4,7 @@ NODE_FQDN = http://302a494c-tifayuki.node.tutum.io
 services = $(shell tutum service ps -q)
 random := $(shell awk 'BEGIN{srand();printf("%d", 65536*rand())}')
 
-test:test-unittest test-without-tutum test-with-tutum ;
+test:test-unittest test-without-tutum test-with-tutum;
 
 test-docker-available:
 	@set -e
@@ -36,7 +36,7 @@ build:create-cert
 certs = $(shell awk 1 ORS='\\n' cert.pem)
 test-without-tutum:build
 	@set -e
-	@echo "====== Running integration tests with Tutum ======"
+	@echo "====== Running integration tests without Tutum ======"
 
 	@echo "==> Testing if haproxy is running properly"
 	docker run -d --name web-a -e HOSTNAME="web-a" tutum/hello-world
@@ -46,7 +46,7 @@ test-without-tutum:build
 	curl --retry 10 --retry-delay 5 -L -I http://localhost:8000 | grep "200 OK"
 	@echo
 
-	@echo "==> Testing virtual host: specified in haproxy cotnainer"
+	@echo "==> Testing virtual host: specified in haproxy container"
 	docker run -d --name lb2 --link web-a:web-a --link web-b:web-b -e VIRTUAL_HOST=" web-a = www.web-a.org, www.test.org, web-b = www.web-b.org " -p 8001:80 tifayuki/haproxy-test
 	wget --spider --retry-connrefused --no-check-certificate -q -T 5 127.0.0.1:8001 || true
 	curl --retry 10 --retry-delay 5 -H 'Host:www.web-a.org' 127.0.0.1:8001 | grep 'My hostname is web-a'
@@ -109,7 +109,7 @@ test-with-tutum:push-image clean-tutum-service
 	curl --retry 10 --retry-delay 5 -sSfL -I $(NODE_FQDN):8000 | grep "200 OK"
 	@echo
 
-	@echo "==> Testing virtual host: specified in haproxy cotnainer with tutum"
+	@echo "==> Testing virtual host: specified in haproxy container with tutum"
 	tutum service run --role global --sync --name $(random)lb2 --link $(random)web-a:web-a --link $(random)web-b:web-b -e VIRTUAL_HOST=" web-a = www.web-a.org, www.test.org, web-b = www.web-b.org " -p 8001:80 tifayuki/haproxy-test
 	wget --spider --retry-connrefused --no-check-certificate -q -T 5 $(NODE_FQDN):8001 || true
 	curl --retry 10 --retry-delay 5 -sSfL -H 'Host:www.web-a.org' $(NODE_FQDN):8001 | grep 'My hostname is web-a'
