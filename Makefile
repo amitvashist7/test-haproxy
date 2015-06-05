@@ -104,7 +104,7 @@ test-with-tutum:push-image clean-tutum-service
 	@echo "==> Testing if haproxy is running properly with tutum"
 	tutum service run --sync --name $(random)web-a -e HOSTNAME="web-a" tutum/hello-world
 	tutum service run --sync --name $(random)web-b -e HOSTNAME="web-b" tutum/hello-world
-	tutum service run --sync --name $(random)lb1 --link $(random)web-a:web-a --link $(random)web-b:web-b -p 8000:80 tifayuki/haproxy-test
+	tutum service run --role global --sync --name $(random)lb1 --link $(random)web-a:web-a --link $(random)web-b:web-b -p 8000:80 tifayuki/haproxy-test
 	wget --spider --retry-connrefused --no-check-certificate -q -T 5 $(NODE_FQDN):8000 || true
 	curl --retry 10 --retry-delay 5 -sSfL -I $(NODE_FQDN):8000 | grep "200 OK"
 	@echo
