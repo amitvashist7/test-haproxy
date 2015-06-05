@@ -56,7 +56,7 @@ def fetch_tutum_obj(uri):
     return obj
 
 
-def run_tutum(container_uri):
+def run_tutum(container_uri=TUTUM_CONTAINER_API_URI):
     global PREVIOUS_CFG_TEXT, HAPROXY_CURRENT_SUBPROCESS
     logger.info("Fetching HAProxy container details through REST Api")
     container = fetch_tutum_obj(container_uri)
@@ -121,8 +121,8 @@ def main():
 
     if TUTUM_SERVICE_API_URI and TUTUM_CONTAINER_API_URI and TUTUM_AUTH:
         init_tutum_settings()
-        run_tutum(TUTUM_CONTAINER_API_URI)
         events = tutum.TutumEvents()
+        events.on_open(run_tutum)
         events.on_message(tutum_event_handler)
         events.run_forever()
     else:
