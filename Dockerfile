@@ -14,20 +14,8 @@ RUN echo 'deb http://ppa.launchpad.net/vbernat/haproxy-1.5/ubuntu trusty main' >
 # the rsyslog destination to where haproxy logs are sent
 ENV RSYSLOG_DESTINATION 127.0.0.1
 
-# BACKEND_PORT is the port of the app server which is load balanced
-ENV BACKEND_PORT 80
-
-# BACKEND_PORTS is the list of ports of the app server which is load balanced
-ENV BACKEND_PORTS **None**
-
-# FRONTEND_PORT is the port on which the load balancer is accessible (also update the EXPOSE directive below)
-ENV FRONTEND_PORT 80
-
 # MODE of operation (http, tcp)
 ENV MODE http
-
-# HDR is the "hdr" criteria used in "acl" for virtualhost
-ENV HDR hdr
 
 # algorithm for load balancing (roundrobin, source, leastconn, ...)
 ENV BALANCE roundrobin
@@ -40,9 +28,6 @@ ENV OPTION redispatch, httplog, dontlognull, forwardfor
 
 # list of timeout entries separated by commas
 ENV TIMEOUT connect 5000, client 50000, server 50000
-
-# Virtual host
-ENV VIRTUAL_HOST **None**
 
 # Stats port
 ENV STATS_PORT 1936
@@ -57,8 +42,8 @@ ENV SSL_CERT **None**
 ENV SSL_BIND_OPTIONS no-sslv3
 
 # Add scripts
-ADD /app /app
-ADD run.sh /run.sh
+ADD /haproxy /haproxy
+ADD run.sh /
 RUN chmod +x /*.sh
 
 EXPOSE 80 443 1936
