@@ -9,6 +9,8 @@ from constants import *
 import utils
 
 
+__version__ = '0.1'
+tutum.user_agent = "tutum-haproxy/%s" % __version__
 
 # Global Var
 HAPROXY_CURRENT_SUBPROCESS = None
