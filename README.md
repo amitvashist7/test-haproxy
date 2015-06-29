@@ -37,7 +37,7 @@ You can overwrite the following HAProxy configuration options:
 * `OPTION` (default: `redispatch`): Comma-separated list of HAProxy `option` entries to the `default` section.
 * `TIMEOUT` (default: `connect 5000,client 50000,server 50000`): Comma-separated list of HAProxy `timeout` entries to the `default` section.
 * `RSYSLOG_DESTINATION` (default: `127.0.0.1`): The rsyslog destination to where haproxy logs are sent
-* `SSL_CERT` (default: `**None**`): An optional certificate to use on the binded port. It should have both the private and public keys content. If set, port 443 will be used to handle HTTPS requests.
+* `SSL_CERT` (default: `**None**`): An optional certificate to use on the binded port. It should have both the private and public keys content. If set, port 443 will be used to handle HTTPS requests.(See: https://github.com/tutumcloud/haproxy#i-want-the-proxy-to-terminate-ssl-connections-and-forward-plain-http-requests-to-my-webapp-to-port-80)
 * `SSL_BIND_OPTIONS` (default: `no-sslv3`): Optional. Explicitly set which SSL bind options will be used for the SSL server. This sets the HAProxy `ssl-default-bind-options` configuration setting. The default will allow only TLSv1.0+ to be used on the SSL server.
 * `SSL_BIND_CIPHERS` (default: `None`): Optional. Explicitly set which SSL ciphers will be used for the SSL server. This sets the HAProxy `ssl-default-bind-ciphers` configuration setting.
 * `VIRTUAL_HOST` (default: `**None**`): Optional. Let HAProxy route by domain name. Format `LINK_ALIAS=DOMAIN`, comma separated.
@@ -80,7 +80,7 @@ Use the following:
 
     docker run -d --link webapp:webapp -p 443:443 -e SSL_CERT="YOUR_CERT_TEXT" tutum/haproxy
 
-The certificate in `YOUR_CERT_TEXT` is a combination of public certificate and private key. Remember to put `\n` between each line of the certificate. A way to do this, assuming that your certificate is stored in `~/cert.pem`, is running the following:
+The certificate in `YOUR_CERT_TEXT` is a combination of private key and public certificate(Note: the sequence matters. You must put private key before the public certificate). Remember to put `\n` between each line of the certificate. A way to do this, assuming that your certificate is stored in `~/cert.pem`, is running the following:
 
     docker run -d --link webapp:webapp -p 443:443 -e SSL_CERT="$(awk 1 ORS='\\n' ~/cert.pem)" tutum/haproxy
 
