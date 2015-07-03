@@ -1,5 +1,5 @@
-WEB_CONTAINERS = web-a web-b web-c web-d web-e web-f web-g web-h web-i web-j web-k web-l web-m web-n web-o web-p web-q web-r web-s
-LB_CONTAINERS = lb0 lb1 lb2 lb3 lb4 lb5 lb6 lb7 lb8
+WEB_CONTAINERS = web-a web-b web-c web-d web-e web-f web-g web-h web-i web-j web-k web-l web-m web-n web-o web-p web-q web-r web-s web-t web-u web-v web-w
+LB_CONTAINERS = lb0 lb1 lb2 lb3 lb4 lb5 lb6 lb7 lb8 lb9
 NODE_FQDN = http://302a494c-tifayuki.node.tutum.io
 services = $(shell tutum service ps -q)
 random := $(shell awk 'BEGIN{srand();printf("%d", 65536*rand())}')
@@ -40,8 +40,8 @@ build:create-cert
 	@echo
 
 cert0 = $(shell awk 1 ORS='\\n' cert0.pem)
-cert1 = $(shell awk 1 ORS='\\n' cert2.pem)
-cert2 = $(shell awk 1 ORS='\\n' cert1.pem)
+cert1 = $(shell awk 1 ORS='\\n' cert1.pem)
+cert2 = $(shell awk 1 ORS='\\n' cert2.pem)
 functest:build
 	@set -e
 	@echo "====== Running functionality integration tests ======"
@@ -189,6 +189,33 @@ functest:build
 	curl --retry 10 --retry-delay 5 -sSfL 127.0.0.1:8011/abc.php/ | grep -iF 'My hostname is web-s' > /dev/null
 	@echo
 
+	echo "==> Testing force_ssl with virtual host"
+	docker rm -f lb8 || true
+	docker run -d --name web-t -e HOSTNAME="web-t" -e VIRTUAL_HOST="https://web-o.org, web-o.org" -e SSL_CERT="$(cert1)" tutum/hello-world
+	docker run -d --name web-u -e HOSTNAME="web-u" -e VIRTUAL_HOST="https://web-p.org, web-p.org" -e SSL_CERT="$(cert2)" -e FORCE_SSL=true tutum/hello-world
+	docker run -d --name lb8  --link web-t:web-t --link web-u:web-u -p 443:443 -p 80:80 haproxy
+	sleep 5
+	curl --cacert ca1.pem -sS https://web-o.org --resolve web-o.org:443:127.0.0.1 | grep -iF 'My hostname is web-t' > /dev/null
+	curl --cacert ca2.pem -sS https://web-p.org --resolve web-p.org:443:127.0.0.1 | grep -iF 'My hostname is web-u' > /dev/null
+	curl --cacert ca1.pem -sSL http://web-o.org --resolve web-o.org:443:127.0.0.1 --resolve web-o.org:80:127.0.0.1 | grep -iF 'My hostname is web-t' > /dev/null
+	curl --cacert ca2.pem -sSL http://web-p.org --resolve web-p.org:443:127.0.0.1 --resolve web-p.org:80:127.0.0.1 | grep -iF 'My hostname is web-u' > /dev/null
+	curl --cacert ca1.pem -sSIL http://web-o.org --resolve web-o.org:443:127.0.0.1 --resolve web-o.org:80:127.0.0.1 | grep -iF "http/1.1" | grep -v "301"
+	curl --cacert ca2.pem -sSIL http://web-p.org --resolve web-p.org:443:127.0.0.1 --resolve web-p.org:80:127.0.0.1 | grep -iF '301 Moved Permanently' > /dev/null
+	@echo
+
+	echo "==> Testing force_ssl without virtual host"
+	docker rm -f lb8 || true
+	docker run -d --name web-v -e HOSTNAME="web-wv" -e SSL_CERT="$(cert0)" tutum/hello-world
+	docker run -d --name web-w -e HOSTNAME="web-wv" -e FORCE_SSL=true tutum/hello-world
+	docker run -d --name lb9  --link web-v:web-v --link web-w:web-w -p 443:443 -p 80:80 haproxy
+	sleep 5
+	curl --cacert ca0.pem -sS https://localhost | grep -iF 'My hostname is web-wv' > /dev/null
+	curl --cacert ca0.pem -sSL http://localhost | grep -iF 'My hostname is web-wv' > /dev/null
+	curl --cacert ca0.pem -sSIL http://localhost | grep -iF '301 Moved Permanently' > /dev/null
+	@echo
+
+	@echo "==> functionality integration tests passed!"
+	@echo
 push-image: build
 	@echo "=> Pushing the image to tifayuki/haproxy"
 	@echo "=> Logging in to docker"
@@ -402,6 +429,9 @@ linktest:push-image clean-tutum-service
 	grep 'My hostname is $(random)web-e-1' output | wc -l | grep 1
 	grep 'My hostname is $(random)web-e-2' output | wc -l | grep 1
 	grep '503 Service Unavailable' output | wc -l | grep 2
+	@echo
+
+	@echo "==> Dynamic link integration tests passed!"
 	@echo
 
 unittest:build

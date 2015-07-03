@@ -39,7 +39,7 @@ class Haproxy(object):
     cls_service_uri = os.getenv("TUTUM_SERVICE_API_URI")
     cls_tutum_auth = os.getenv("TUTUM_AUTH")
     cls_linked_services = None
-    cls__cfg = None
+    cls_cfg = None
     cls_haproxy_process = None
 
     def __init__(self):
@@ -49,11 +49,11 @@ class Haproxy(object):
             container = self.fetch_tutum_obj(Haproxy.cls_container_uri)
             service = self.fetch_tutum_obj(Haproxy.cls_service_uri)
             Haproxy.cls_linked_services = [srv.get("to_service") for srv in service.linked_to_service]
-            self.link_specs = Specs(container, service)
+            self.specs = Specs(container, service)
         else:
             logger.info("Loading HAProxy definition from environment variables")
             Haproxy.cls_linked_services = None
-            Haproxy.link_specs = Specs()
+            Haproxy.specs = Specs()
 
     def update(self):
         cfg_dict = OrderedDict()
@@ -64,19 +64,19 @@ class Haproxy(object):
 
         cfg = self._prettify(cfg_dict)
         if Haproxy.cls_service_uri and Haproxy.cls_container_uri and Haproxy.cls_tutum_auth:
-            if Haproxy.cls__cfg != cfg:
-                if not Haproxy.cls__cfg:
+            if Haproxy.cls_cfg != cfg:
+                if not Haproxy.cls_cfg:
                     logger.info("HAProxy configuration:\n%s" % cfg)
                 else:
                     logger.info("HAProxy configuration is updated:\n%s" % cfg)
-                Haproxy.cls__cfg = cfg
+                Haproxy.cls_cfg = cfg
                 if self._save_conf():
                     self._run()
             else:
                 logger.info("HAProxy configuration remains unchanged")
         else:
             logger.info("HAProxy configuration:\n%s" % cfg)
-            Haproxy.cls__cfg = cfg
+            Haproxy.cls_cfg = cfg
             self._save_conf()
             logger.info("Launching HAProxy")
             p = subprocess.Popen(self.const_command)
@@ -108,8 +108,8 @@ class Haproxy(object):
         certs = []
         if self.envvar_default_ssl_cert:
             certs.append(self.envvar_default_ssl_cert)
-        certs.extend(self.link_specs.get_default_ssl_cert())
-        certs.extend(self.link_specs.get_ssl_cert())
+        certs.extend(self.specs.get_default_ssl_cert())
+        certs.extend(self.specs.get_ssl_cert())
         self._save_certs(certs)
         if certs:
             self.ssl = "ssl crt /certs/"
@@ -132,7 +132,7 @@ class Haproxy(object):
     def _save_conf(self):
         try:
             with open(self.const_config_file, 'w') as f:
-                f.write(Haproxy.cls__cfg)
+                f.write(Haproxy.cls_cfg)
             return True
         except Exception as e:
             logger.error(e)
@@ -178,15 +178,30 @@ class Haproxy(object):
 
     def _config_frontend(self):
         cfg = OrderedDict()
-        if self.link_specs.get_vhosts():
+        if self.specs.get_vhosts():
             frontends_dict = {}
             rule_counter = 0
-            for vhost in self.link_specs.get_vhosts():
-                # caculate acl rules
+            for vhost in self.specs.get_vhosts():
                 rule_counter += 1
+                port = vhost["port"]
+
+                # initialize bind clause for each port
+                if port not in frontends_dict:
+                    ssl = False
+                    for v in self.specs.get_vhosts():
+                        if v["port"] == port:
+                            scheme = v["scheme"].lower()
+                            if scheme in ["https", "wss"] and self.ssl:
+                                ssl = True
+                                break
+                    if ssl:
+                        frontends_dict[port] = ["bind :%s %s" % (port, self.ssl), "reqadd X-Forwarded-Proto:\ https"]
+                    else:
+                        frontends_dict[port] = ["bind :%s" % port]
+
+                # calculate virtual host rule
                 host_acl = ["acl", "host_rule_%d" % rule_counter]
                 host = vhost["host"].strip("/")
-
                 if host == "*":
                     pass
                 elif "*" in host:
@@ -198,6 +213,7 @@ class Haproxy(object):
                 elif host:
                     host_acl.append("hdr_dom(host) -i %s" % host)
 
+                # calculate virtual path rules
                 path_acl = ["acl", "path_rule_%d" % rule_counter]
                 path = vhost["path"].strip()
                 if "*" in path[1:-1]:
@@ -210,43 +226,21 @@ class Haproxy(object):
                     path_acl.append("path -i %s" % path)
 
                 if len(host_acl) > 2 or len(path_acl):
-                    port = vhost["port"]
+                    service_alias = vhost["service_alias"]
                     if len(host_acl) > 2 and len(path_acl) > 2:
-                        rule = [" ".join(host_acl), " ".join(path_acl),
-                                "use_backend SERVICE_%s if host_rule_%d path_rule_%d" %
-                                (vhost["service_alias"], rule_counter, rule_counter)]
+                        acl_condition = "host_rule_%d path_rule_%d" % (rule_counter, rule_counter)
+                        acl_rule = [" ".join(host_acl), " ".join(path_acl),
+                                "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
                     elif len(host_acl) > 2:
-                        rule = [" ".join(host_acl), "use_backend SERVICE_%s if host_rule_%d" %
-                                (vhost["service_alias"], rule_counter)]
+                        acl_condition = "host_rule_%d" % rule_counter
+                        acl_rule = [" ".join(host_acl),
+                                "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
                     elif len(path_acl) > 2:
-                        rule = [" ".join(path_acl), "use_backend SERVICE_%s if path_rule_%d" %
-                                (vhost["service_alias"], rule_counter)]
+                        acl_condition = "path_rule_%d" % rule_counter
+                        acl_rule = [" ".join(path_acl),
+                                "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
 
-                    if port in frontends_dict:
-                        frontend = frontends_dict[port]
-                        frontend.extend(rule)
-                    else:
-                        ssl = False
-                        force_ssl = False
-                        for v in self.link_specs.get_vhosts():
-                            if v["port"] == port:
-                                service = v["service_alias"]
-                                if self.link_specs.specs[service]["force_ssl"]:
-                                    force_ssl = True
-                                scheme = v["scheme"].lower()
-                                if scheme in ["https", "wss"]:
-                                    ssl = True
-                                    break
-                        if ssl:
-                            frontend = ["bind :%s %s" % (port, self.ssl)]
-                            frontend.append("reqadd X-Forwarded-Proto:\ https")
-                        else:
-                            frontend = ["bind :%s" % port]
-                            if force_ssl:
-                                frontend.append("redirect scheme https code 301 if !{ ssl_fc }")
-
-                        frontend.extend(rule)
-                        frontends_dict[port] = frontend
+                    frontends_dict[port].extend(acl_rule)
             for port, frontend in frontends_dict.iteritems():
                 cfg["frontend port_%s" % port] = frontend
         else:
@@ -254,7 +248,7 @@ class Haproxy(object):
             if self.ssl:
                 frontend.append("bind :443 %s" % self.ssl)
                 frontend.append("reqadd X-Forwarded-Proto:\ https")
-                if self.link_specs.get_force_ssl():
+                if self.specs.get_force_ssl():
                     frontend.append("redirect scheme https code 301 if !{ ssl_fc }")
             frontend.append("default_backend default_service")
             cfg["frontend default_frontend"] = frontend
@@ -263,62 +257,49 @@ class Haproxy(object):
     def _config_backend(self):
         cfg = OrderedDict()
 
-        if not self.link_specs.get_vhosts():
-            services = [None]
+        if not self.specs.get_vhosts():
+            services_aliases = [None]
         else:
-            services = self.link_specs.service_aliases
+            services_aliases = self.specs.service_aliases
 
-        for service in services:
+        for service_alias in services_aliases:
             backend = []
             route_setting = []
 
             # To add an entry to backend section: append to backend
             # To add items to a route: append to route_setting
-            balance = self._get_service_attr("balance", service)
+            balance = self._get_service_attr("balance", service_alias)
             if balance:
                 backend.append("balance %s" % balance)
 
-            appsession = self._get_service_attr("appsession", service)
+            appsession = self._get_service_attr("appsession", service_alias)
             if appsession:
                 backend.append("appsession %s len 64 timeout 3h request-learn prefix" % appsession)
                 route_setting.append("cookie check")
 
-            for service_alias, routes in self.link_specs.get_routes().iteritems():
-                if not service or service == service_alias:
+            force_ssl = self._get_service_attr("force_ssl", service_alias)
+            if force_ssl: #and self.ssl not in frontend[0]:
+                backend.append("redirect scheme https code 301 if !{ ssl_fc }")
+
+            for _service_alias, routes in self.specs.get_routes().iteritems():
+                if not service_alias or _service_alias == service_alias:
                     for route in routes:
                         backend_route = "server %s %s:%s" % (route["container_name"], route["addr"], route["port"])
                         if route_setting:
                             backend_route = " ".join([backend_route, " ".join(route_setting)])
                         backend.append(backend_route)
 
-            if not service:
+            if not service_alias:
                 cfg["backend default_service"] = sorted(backend)
             else:
-                cfg["backend SERVICE_%s" % service] = sorted(backend)
+                cfg["backend SERVICE_%s" % service_alias] = sorted(backend)
         return cfg
 
-    def _get_service_attr(self, attr_name, service_alias=None):
-        attr_value = None
-
-        # check if the attribute is set in the linked services
-        method_name = "get_%s" % attr_name
-        if hasattr(self.link_specs, method_name):
-            attr = getattr(self.link_specs, method_name)()
-        else:
+    def _get_service_attr(self, attr_name, service_alias):
+        try:
+            return self.specs.details[service_alias][attr_name]
+        except:
             return None
-
-        # random pick up a value when service_alias is None, which means haproxy is running not with tutum
-        if service_alias:
-            attr_value = attr.get(service_alias)
-        else:
-            if attr:
-                attr_value = next(attr.itervalues())
-
-        # try to see if there is a setting in haproxy container globally
-        if not attr_value:
-            attr_value = getattr(Haproxy, "envvar_%s" % attr_name, None)
-
-        return attr_value
 
     @classmethod
     def fetch_tutum_obj(cls, uri):

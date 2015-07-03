@@ -16,7 +16,7 @@ class Specs(object):
     def __init__(self, tutum_haproxy_container=None, tutum_haproxy_service=None):
         self.envvars = self._parse_envvars(tutum_haproxy_container)
         self.service_aliases = self._parser_service_aliases(tutum_haproxy_service)
-        self.specs = self._parse_specs()
+        self.details = self._parse_specs()
         self.routes = self._parse_routes(tutum_haproxy_container)
         self.vhosts = self._parse_vhosts()
 
@@ -48,11 +48,11 @@ class Specs(object):
         return env_parser.get_spec()
 
     def _parse_routes(self, tutum_haproxy_container):
-        return RouteParser.parse(self.specs, tutum_haproxy_container)
+        return RouteParser.parse(self.details, tutum_haproxy_container)
 
     def _parse_vhosts(self):
         vhosts = []
-        for service_alias, attr in self.specs.iteritems():
+        for service_alias, attr in self.details.iteritems():
             virtual_hosts = attr["virtual_host"]
 
             if virtual_hosts:
@@ -62,7 +62,7 @@ class Specs(object):
         return vhosts
 
     def get_specs(self):
-        return self.specs
+        return self.details
 
     def get_routes(self):
         return self.routes
@@ -72,18 +72,18 @@ class Specs(object):
 
     def get_default_ssl_cert(self):
         if not hasattr(self, "default_ssl_cert"):
-            self.default_ssl_cert = filter(lambda x: x, [attr["default_ssl_cert"] for attr in self.specs.itervalues()])
+            self.default_ssl_cert = filter(lambda x: x, [attr["default_ssl_cert"] for attr in self.details.itervalues()])
         return self.default_ssl_cert
 
     def get_ssl_cert(self):
         if not hasattr(self, "ssl_cert"):
-            self.ssl_cert = filter(lambda x: x, [attr["ssl_cert"] for attr in self.specs.itervalues()])
+            self.ssl_cert = filter(lambda x: x, [attr["ssl_cert"] for attr in self.details.itervalues()])
         return self.ssl_cert
 
     def get_force_ssl(self):
         if not hasattr(self, "force_ssl"):
             self.force_ssl = []
-            for container_alias, attr in self.specs.iteritems():
+            for container_alias, attr in self.details.iteritems():
                 if attr["force_ssl"]:
                     self.force_ssl.append(container_alias)
         return self.force_ssl
