@@ -2,6 +2,7 @@ import os
 import logging
 import subprocess
 import time
+import copy
 from collections import OrderedDict
 
 import tutum
@@ -41,9 +42,11 @@ class Haproxy(object):
     cls_linked_services = None
     cls_cfg = None
     cls_haproxy_process = None
+    cls_certs = []
 
     def __init__(self):
         self.ssl = None
+        self.ssl_updated = False
         if Haproxy.cls_container_uri and Haproxy.cls_service_uri and Haproxy.cls_tutum_auth:
             logger.info("Loading HAProxy definition through REST API")
             container = self.fetch_tutum_obj(Haproxy.cls_container_uri)
@@ -72,6 +75,8 @@ class Haproxy(object):
                 Haproxy.cls_cfg = cfg
                 if self._save_conf():
                     self._run()
+            elif self.ssl_updated:
+                self._run()
             else:
                 logger.info("HAProxy configuration remains unchanged")
         else:
@@ -110,8 +115,11 @@ class Haproxy(object):
             certs.append(self.envvar_default_ssl_cert)
         certs.extend(self.specs.get_default_ssl_cert())
         certs.extend(self.specs.get_ssl_cert())
-        self._save_certs(certs)
         if certs:
+            if set(certs) != set(Haproxy.cls_certs):
+                Haproxy.cls_certs = copy.copy(certs)
+                self.ssl_updated = True
+                self._save_certs(certs)
             self.ssl = "ssl crt /certs/"
 
     def _save_certs(self, certs):
@@ -122,12 +130,12 @@ class Haproxy(object):
             logger.error(e)
         for index, cert in enumerate(certs):
             cert_filename = "%scert%d.pem" % (self.const_cert_dir, index)
-            logger.info(cert_filename)
             try:
                 with open(cert_filename, 'w') as f:
                     f.write(cert.replace("\\n", '\n'))
             except Exception as e:
                 logger.error(e)
+        logger.info("SSL certificates are updated")
 
     def _save_conf(self):
         try:
