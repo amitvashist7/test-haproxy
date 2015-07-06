@@ -154,7 +154,7 @@ Use the following:
 
 #### My webapp container exposes port 8080 and database ports 8083/8086, and I want the proxy to listen in port 80 without my database ports added to haproxy
 
-	docker run -d --link webapp:webapp -e EXLUCDE_PORTS 8803,8806 -p 80:80 tutum/haproxy
+	docker run -d --link webapp:webapp -e EXCLUDE_PORTS 8803,8806 -p 80:80 tutum/haproxy
 
 #### My webapp container exposes port 8080(or any other port), and I want the proxy to listen in port 8080
 
