@@ -6,7 +6,14 @@ tutum/haproxy
 HAProxy image that balances between linked containers and, if launched in Tutum,
 reconfigures itself when a linked cluster member redeploys, joins or leaves
 
+Tag
+---
 
+    tutum/haproxy:latest    github branch master
+    tutum/haproxy:0.1       github tag 0.1
+
+    Note: `latest` is updated with new futures, like `virtual host`, `multiple ssl`, `multiple frontend`
+          `0.1` is the current stable version, with less features.
 Usage
 -----
 
