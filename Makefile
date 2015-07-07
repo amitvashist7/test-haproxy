@@ -193,7 +193,7 @@ functest:build
 	docker rm -f lb8 || true
 	docker run -d --name web-t -e HOSTNAME="web-t" -e VIRTUAL_HOST="https://web-o.org, web-o.org" -e SSL_CERT="$(cert1)" tutum/hello-world
 	docker run -d --name web-u -e HOSTNAME="web-u" -e VIRTUAL_HOST="https://web-p.org, web-p.org" -e SSL_CERT="$(cert2)" -e FORCE_SSL=true tutum/hello-world
-	docker run -d --name lb8  --link web-t:web-t --link web-u:web-u -p 443:443 -p 80:80 haproxy
+	docker run -d --name lb8  --link web-t:web-t --link web-u:web-u -p 443:443 -p 80:80 tifayuki/haproxy-test
 	sleep 5
 	curl --cacert ca1.pem -sS https://web-o.org --resolve web-o.org:443:127.0.0.1 | grep -iF 'My hostname is web-t' > /dev/null
 	curl --cacert ca2.pem -sS https://web-p.org --resolve web-p.org:443:127.0.0.1 | grep -iF 'My hostname is web-u' > /dev/null
@@ -207,7 +207,7 @@ functest:build
 	docker rm -f lb8 || true
 	docker run -d --name web-v -e HOSTNAME="web-wv" -e SSL_CERT="$(cert0)" tutum/hello-world
 	docker run -d --name web-w -e HOSTNAME="web-wv" -e FORCE_SSL=true tutum/hello-world
-	docker run -d --name lb9  --link web-v:web-v --link web-w:web-w -p 443:443 -p 80:80 haproxy
+	docker run -d --name lb9  --link web-v:web-v --link web-w:web-w -p 443:443 -p 80:80 tifayuki/haproxy-test
 	sleep 5
 	curl --cacert ca0.pem -sS https://localhost | grep -iF 'My hostname is web-wv' > /dev/null
 	curl --cacert ca0.pem -sSL http://localhost | grep -iF 'My hostname is web-wv' > /dev/null
