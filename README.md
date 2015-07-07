@@ -12,8 +12,7 @@ Tag
     tutum/haproxy:latest    github branch master
     tutum/haproxy:0.1       github tag 0.1
 
-    Note: `latest` is updated with new futures, like `virtual host`, `multiple ssl`, `multiple frontend`
-          `0.1` is the current stable version, with less features.
+Note: tag `latest` is updated with new futures, like `virtual host`, `multiple ssl`, `multiple frontend`. tag `0.1` is the current stable version, with less features.
 Usage
 -----
 
@@ -141,7 +140,7 @@ Usage within Tutum
 
 Launch the service you want to load-balance using Tutum.
 
-Then, launch the load balancer. To do this, select "Jumpstarts", "Proxies" and select `tutum/haproxy`. During the "Environment variables" step of the wizard, link to the service created earlier (the name of the link is not important), and add "Full Access" API role (this will allow HAProxy to be updated dynamically by querying Tutum's API). If you are using tutumcli, or stack file, please set `role` to `global`
+Then, launch the load balancer. To do this, select "Jumpstarts", "Proxies" and select `tutum/haproxy`. During the "Environment variables" step of the wizard, link to the service created earlier (the name of the link is not important), and add "Full Access" API role (this will allow HAProxy to be updated dynamically by querying Tutum's API). If you are using `tutumcli`, or `stackfile`, please set `role` to `global`
 
 That's it - the proxy container will start querying Tutum's API for an updated list of containers in the service and reconfigure itself automatically, including:
 
