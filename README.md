@@ -55,7 +55,8 @@ Settings here can overwrite the settings in HAProxy, which are only applied to t
 
 |env var|description|
 |:-----:|:----------|
-|APPSESSION|add `appsession <APPSESSION> len 64 timeout 3h request-learn prefix` for handling sticky session|
+|APPSESSION|sticky session option. possible value `JSESSIONID len 52 timeout 3h`|
+|COOKIE|sticky session option. possible value `SRV insert indirect nocache`|
 |SSL_CERT|ssl cert, a pem file with private key followed by public certificate, '\n'(two chars) as the line separator|
 |DEFAULT_SSL_CERT|similar to SSL_CERT, but stores the pem file at `/certs/cert0.pem` as the default ssl certs. If multiple `DEFAULT_SSL_CERT` are specified in linked services and HAProxy, the behavior is undefined|
 |EXCLUDE_PORTS|comma separated port numbers(e.g. 3306, 3307). By default, HAProxy will add all the ports exposed by the application services to the backend routes. You can exclude the ports that you don't want to be routed, like database port|
@@ -63,7 +64,7 @@ Settings here can overwrite the settings in HAProxy, which are only applied to t
 |FORCE_SSL|if set(any value) together with ssl termination enabled. HAProxy will redirect HTTP request to HTTPS request.
 |VIRTUAL_HOST|specify virtual host and virtual path. Format: `[scheme://]domain[:port][/path], ...`. wildcard `*` can be used in `domain` and `path` part|
 
-Check [the HAProxy configuration manual](http://haproxy.1wt.eu/download/1.4/doc/configuration.txt) for more information on the above.
+Check [the HAProxy configuration manual](http://cbonte.github.io/haproxy-dconv/configuration-1.5.html) for more information on the above.
 
 Virtual host and virtual path
 -----------------------------
@@ -133,6 +134,17 @@ Once you have the pem file, you can run:
 	awk 1 ORS='\\n' cert.pem
 
 Copy the output and set it as the value of `SSL_CERT` or `DEFAULT_SSL_CERT`.
+
+Affinity and session stickiness
+-----------------------------------
+
+There are tree method to setup affinity and sticky session:
+
+1. set `BALANCE=source` in your application service. When setting `source` method of balance, HAProxy will hash the client IP address and make sure that the same IP always goes to the same server.
+2. set `APPSESSION=<value>`. use application session to determine which server a client should connect to. Possible value of `<value>` could be `JSESSIONID len 52 timeout 3h`
+2. set `COOKIE=<value>`. use application cookie to determine which server a client should connect to. Possible value of `<value>` could be `SRV insert indirect nocache`
+
+Check [HAProxy:appsession](http://cbonte.github.io/haproxy-dconv/configuration-1.5.html#4-appsession) and [HAProxy:cookie](http://cbonte.github.io/haproxy-dconv/configuration-1.5.html#4-cookie) for more information.
 
 
 Usage within Tutum
