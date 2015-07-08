@@ -272,7 +272,7 @@ class Haproxy(object):
 
         for service_alias in services_aliases:
             backend = []
-            route_setting = []
+            is_sticky = False
 
             # To add an entry to backend section: append to backend
             # To add items to a route: append to route_setting
@@ -282,19 +282,24 @@ class Haproxy(object):
 
             appsession = self._get_service_attr("appsession", service_alias)
             if appsession:
-                backend.append("appsession %s len 64 timeout 3h request-learn prefix" % appsession)
-                route_setting.append("cookie check")
+                backend.append("appsession %s" % appsession)
+                is_sticky = True
+
+            cookie = self._get_service_attr("cookie", service_alias)
+            if cookie:
+                backend.append("cookie %s" % cookie)
+                is_sticky = True
 
             force_ssl = self._get_service_attr("force_ssl", service_alias)
-            if force_ssl: #and self.ssl not in frontend[0]:
+            if force_ssl:
                 backend.append("redirect scheme https code 301 if !{ ssl_fc }")
 
             for _service_alias, routes in self.specs.get_routes().iteritems():
                 if not service_alias or _service_alias == service_alias:
                     for route in routes:
                         backend_route = "server %s %s:%s" % (route["container_name"], route["addr"], route["port"])
-                        if route_setting:
-                            backend_route = " ".join([backend_route, " ".join(route_setting)])
+                        if is_sticky:
+                            backend_route = " ".join([backend_route, "cookie %s" % route["container_name"]])
                         backend.append(backend_route)
 
             if not service_alias:
@@ -304,9 +309,17 @@ class Haproxy(object):
         return cfg
 
     def _get_service_attr(self, attr_name, service_alias):
-        try:
-            return self.specs.details[service_alias][attr_name]
-        except:
+        # service is None, when there is no virtual host is set
+        if service_alias:
+            try:
+                return self.specs.get_details()[service_alias][attr_name]
+            except:
+                return None
+        else:
+            # Randomly pick a None value from the linked service
+            for service_alias in self.specs.get_details().iterkeys():
+                if self.specs.get_details()[service_alias][attr_name]:
+                    return self.specs.get_details()[service_alias][attr_name]
             return None
 
     @classmethod

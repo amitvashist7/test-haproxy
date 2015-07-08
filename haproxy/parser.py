@@ -16,7 +16,7 @@ class Specs(object):
     def __init__(self, tutum_haproxy_container=None, tutum_haproxy_service=None):
         self.envvars = self._parse_envvars(tutum_haproxy_container)
         self.service_aliases = self._parser_service_aliases(tutum_haproxy_service)
-        self.details = self._parse_specs()
+        self.details = self._parse_details()
         self.routes = self._parse_routes(tutum_haproxy_container)
         self.vhosts = self._parse_vhosts()
 
@@ -41,11 +41,11 @@ class Specs(object):
                     service_aliases.append(key[:match.start()])
         return service_aliases
 
-    def _parse_specs(self):
+    def _parse_details(self):
         env_parser = EnvParser(self.service_aliases)
         for key, value in self.envvars.iteritems():
             env_parser.parse(key, value)
-        return env_parser.get_spec()
+        return env_parser.get_details()
 
     def _parse_routes(self, tutum_haproxy_container):
         return RouteParser.parse(self.details, tutum_haproxy_container)
@@ -61,7 +61,7 @@ class Specs(object):
                     vhosts.append(vhost)
         return vhosts
 
-    def get_specs(self):
+    def get_details(self):
         return self.details
 
     def get_routes(self):
@@ -83,9 +83,9 @@ class Specs(object):
     def get_force_ssl(self):
         if not hasattr(self, "force_ssl"):
             self.force_ssl = []
-            for container_alias, attr in self.details.iteritems():
+            for service_alias, attr in self.details.iteritems():
                 if attr["force_ssl"]:
-                    self.force_ssl.append(container_alias)
+                    self.force_ssl.append(service_alias)
         return self.force_ssl
 
 
@@ -190,7 +190,7 @@ class EnvParser(object):
                             else:
                                 self.specs[service_alias] = {attr_name: attr_value}
 
-    def get_spec(self):
+    def get_details(self):
         return self.specs
 
     @staticmethod
@@ -239,4 +239,8 @@ class EnvParser(object):
 
     @staticmethod
     def parse_balance(value):
+        return value
+
+    @staticmethod
+    def parse_cookie(value):
         return value
