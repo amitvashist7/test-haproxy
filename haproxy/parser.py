@@ -45,6 +45,12 @@ class Specs(object):
         env_parser = EnvParser(self.service_aliases)
         for key, value in self.envvars.iteritems():
             env_parser.parse(key, value)
+        details = env_parser.get_details()
+
+        # generate empty details if there is no environment variables set in the application services
+        for service_alias in set(self.service_aliases) - set(details.iterkeys()):
+            env_parser.parse(service_alias+"_ENV_", "")
+
         return env_parser.get_details()
 
     def _parse_routes(self, tutum_haproxy_container):
@@ -165,7 +171,7 @@ class EnvParser(object):
 
     def __init__(self, service_aliases):
         self.service_aliases = service_aliases
-        self.specs = {}
+        self.details = {}
 
     def parse(self, key, value):
         for method in self.__class__.__dict__:
@@ -179,32 +185,36 @@ class EnvParser(object):
                             if key.endswith("_ENV_%s" % attr_name.upper()):
                                 attr_value = getattr(self, method)(value)
                             else:
-                                attr_value = None
+                                attr_value = getattr(self, method)(None)
 
-                            if service_alias in self.specs:
-                                if attr_name in self.specs[service_alias]:
+                            if service_alias in self.details:
+                                if attr_name in self.details[service_alias]:
                                     if attr_value:
-                                        self.specs[service_alias][attr_name] = attr_value
+                                        self.details[service_alias][attr_name] = attr_value
                                 else:
-                                    self.specs[service_alias][attr_name] = attr_value
+                                    self.details[service_alias][attr_name] = attr_value
                             else:
-                                self.specs[service_alias] = {attr_name: attr_value}
+                                self.details[service_alias] = {attr_name: attr_value}
 
     def get_details(self):
-        return self.specs
+        return self.details
 
     @staticmethod
     def parse_default_ssl_cert(value):
-        return value.replace(r'\n', '\n')
+        if value:
+            return value.replace(r'\n', '\n')
+        return ""
 
     @staticmethod
     def parse_ssl_cert(value):
-        return value.replace(r'\n', '\n')
+        return EnvParser.parse_default_ssl_cert(value)
 
     @staticmethod
     def parse_exclude_ports(value):
         # '3306, 8080' => ['3306', '8080']
-        return [x.strip() for x in value.strip().split(",")]
+        if value:
+            return [x.strip() for x in value.strip().split(",")]
+        return []
 
     @staticmethod
     def parse_virtual_host(value):
@@ -212,6 +222,9 @@ class EnvParser(object):
         #   [{'path': '', 'host': 'a.com', 'scheme': 'http', 'port': '8080'},
         #    {'path': '', 'host': 'b.com', 'scheme': 'https', 'port': '443'},
         #    {'path': '', 'host': 'c.com', 'scheme': 'http', 'port': '80'}]
+        if not value:
+            return []
+
         vhosts = []
         for h in [h.strip() for h in value.strip().split(",")]:
             pr = urlparse.urlparse(h)
@@ -244,3 +257,10 @@ class EnvParser(object):
     @staticmethod
     def parse_cookie(value):
         return value
+
+    @staticmethod
+    def parse_tcp_ports(value):
+        # '9000, 22' => ['9000', '22']
+        if value:
+            return [p.strip() for p in value.strip().split(",") if p.strip()]
+        return []
