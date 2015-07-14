@@ -27,6 +27,18 @@ Then, run `tutum/haproxy` linking it to the target containers:
 
 The `tutum/haproxy` container will listen in port 80 and forward requests to both `web1` and `web2` backends using a `roundrobin` algorithm.
 
+Service vs container
+-------------------
+
+*container: the building block of docker.
+*service: the building block of tutum and tutum/haproxy
+
+What is a service? Service is a set of containers that have the same functionality. Usually, containers are created with the same parameters can be considered as a service. Service is a perfect concept for the load balancing management. When you scale up/down a service(changing the number of containers in the service), haproxy will balance the load accordingly.
+
+To set containers in one service, you can:
+
+1. Run `tutum/haproxy` with Tutum: When you set a link in Tutum, it sets a link between services, everything is done transparently.
+2. Run `tutum/haproxy` outside tutum: When you link containers to `tutum/haproxy`, the link alias matters. Any link alias sharing the same prefix and followed by "-/_" with an integer is considered from the same service. For example: `web-1` and `web-2` belong to service `web`, `app_1` and `app_2` are from service `app`, but `app1` and `web2` are from different services.
 
 Configuration
 -------------
@@ -110,7 +122,7 @@ SSL termination
 
 `tutum/haproxy` supports ssl termination on multiple certificates. For each application that you want ssl terminates, simply set `SSL_CERT` and `VIRTUAL_HOST`. HAProxy, then, reads the certificate from the link environment and sets the ssl termination up.
 
-**Attention**: there was a bug that if an environment variable value contains "=", which is common in the `SSL_CERT`, docker skips that environment variable. As a result, multiple ssl termination only works on docker 1.7.0 or higher, or in Tutum
+**Attention**: there was a bug that if an environment variable value contains "=", which is common in the `SSL_CERT`, docker skips that environment variable. As a result, multiple ssl termination only works on docker 1.7.0 or higher, or in Tutum.
 
 SSL termination is enabled when:
 
@@ -285,21 +297,21 @@ Topologies using virtual hosts
 
 Within Tutum:
 
-                                                         |---- container 1
-                                  |----- service 1 ----- |---- container 2
-                                  |   (virtual host 1)   |---- container 3
+                                                         |---- container_a1
+                                  |----- service_a ----- |---- container_a2
+                                  |   (virtual host a)   |---- container_a3
     internet --- tutum/haproxy--- |
-                                  |                      |---- container a
-                                  |----- service 2 ----- |---- container b
-                                      (virtual host 2)   |---- container c
+                                  |                      |---- container_b1
+                                  |----- service_b ----- |---- container_b2
+                                      (virtual host b)   |---- container_b3
 
 
 Outside Tutum (any Docker server):
 
-                                  |---- container 1 (virtual host 1)
-                                  |---- container 2 (virtual host 1)
-                                  |---- container 3 (virtual host 1)
+                                  |---- container_a1 (virtual host a) ---|
+                                  |---- container_a2 (virtual host a) ---|---logic service_a
+                                  |---- container_a3 (virtual host a) ---|
     internet --- tutum/haproxy--- |
-                                  |---- container a (virtual host 2)
-                                  |---- container b (virtual host 2)
-                                  |---- container c (virtual host 2)
+                                  |---- container_b1 (virtual host b) ---|
+                                  |---- container_b2 (virtual host b) ---|---logic service_b
+                                  |---- container_b3 (virtual host b) ---|

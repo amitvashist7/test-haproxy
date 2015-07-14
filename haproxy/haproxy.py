@@ -271,15 +271,15 @@ class Haproxy(object):
                     if len(host_acl) > 2 and len(path_acl) > 2:
                         acl_condition = "host_rule_%d path_rule_%d" % (rule_counter, rule_counter)
                         acl_rule = [" ".join(host_acl), " ".join(path_acl),
-                                "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
+                                    "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
                     elif len(host_acl) > 2:
                         acl_condition = "host_rule_%d" % rule_counter
                         acl_rule = [" ".join(host_acl),
-                                "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
+                                    "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
                     elif len(path_acl) > 2:
                         acl_condition = "path_rule_%d" % rule_counter
                         acl_rule = [" ".join(path_acl),
-                                "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
+                                    "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
 
                     frontends_dict[port].extend(acl_rule)
 
