@@ -161,19 +161,27 @@ class RouteParser(object):
                 continue
             alias_match = RouteParser.service_alias_match.search(key)
             if alias_match:
-                service_alias = key[:alias_match.start()]
+                service_alias = ""
+                container_alias = key[:alias_match.start()]
                 for _sevices_alias in service_aliases:
-                    if service_alias.startswith(_sevices_alias):
+                    if container_alias.startswith(_sevices_alias):
                         service_alias = _sevices_alias
                         break
 
                 be_match = RouteParser.backend_match.match(value)
                 if be_match:
                     route = RouteParser.backend_match.match(value).groupdict()
-                    route.update({"container_name": service_alias})
+
+                    route.update({"container_name": container_alias})
                     exclude_ports = details.get(service_alias, {}).get("exclude_ports")
                     if not exclude_ports or (exclude_ports and route["port"] not in exclude_ports):
                         if service_alias in routes:
+                            # Avoid add the dulicated route twice(remove the first one, which is inject as the service name
+                            for _route in routes[service_alias]:
+                                if route['proto'] == _route['proto'] and \
+                                                route['port'] == _route['port'] and \
+                                                route['addr'] == _route['addr']:
+                                    routes[service_alias].remove(_route)
                             routes[service_alias].append(route)
                         else:
                             routes[service_alias] = [route]
