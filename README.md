@@ -27,6 +27,18 @@ Then, run `tutum/haproxy` linking it to the target containers:
 
 The `tutum/haproxy` container will listen in port 80 and forward requests to both `web1` and `web2` backends using a `roundrobin` algorithm.
 
+Service vs container
+-------------------
+
+*container: the building block of docker.
+*service: the building block of tutum and tutum/haproxy
+
+What is a service? Service is a set of containers that have the same functionality. Usually, containers are created with the same parameters can be considered as a service. Service is a perfect concept for the load balancing management. When you scale up/down a service(changing the number of containers in the service), haproxy will balance the load accordingly.
+
+To set containers in one service, you can:
+
+1. Run `tutum/haproxy` with Tutum: When you set a link in Tutum, it sets a link between services, everything is done transparently.
+2. Run `tutum/haproxy` outside tutum: When you link containers to `tutum/haproxy`, the link alias matters. Any link alias sharing the same prefix and followed by "-/_" with an integer is considered from the same service. For example: `web-1` and `web-2` belong to service `web`, `app_1` and `app_2` are from service `app`, but `app1` and `web2` are from different services.
 
 Configuration
 -------------
@@ -60,6 +72,7 @@ Settings here can overwrite the settings in HAProxy, which are only applied to t
 |SSL_CERT|ssl cert, a pem file with private key followed by public certificate, '\n'(two chars) as the line separator|
 |DEFAULT_SSL_CERT|similar to SSL_CERT, but stores the pem file at `/certs/cert0.pem` as the default ssl certs. If multiple `DEFAULT_SSL_CERT` are specified in linked services and HAProxy, the behavior is undefined|
 |EXCLUDE_PORTS|comma separated port numbers(e.g. 3306, 3307). By default, HAProxy will add all the ports exposed by the application services to the backend routes. You can exclude the ports that you don't want to be routed, like database port|
+|TCP_PORTS|comma separated port mumbers(e.g. 9000, 9001). The port listed in `TCP_PORTS` will be load-balanced in TCP mode.
 |BALANCE|load balancing algorithm to use. Possible values include: `roundrobin`, `static-rr`, `source`, `leastconn`|
 |FORCE_SSL|if set(any value) together with ssl termination enabled. HAProxy will redirect HTTP request to HTTPS request.
 |VIRTUAL_HOST|specify virtual host and virtual path. Format: `[scheme://]domain[:port][/path], ...`. wildcard `*` can be used in `domain` and `path` part|
@@ -109,7 +122,7 @@ SSL termination
 
 `tutum/haproxy` supports ssl termination on multiple certificates. For each application that you want ssl terminates, simply set `SSL_CERT` and `VIRTUAL_HOST`. HAProxy, then, reads the certificate from the link environment and sets the ssl termination up.
 
-**Attention**: there was a bug that if an environment variable value contains "=", which is common in the `SSL_CERT`, docker skips that environment variable. As a result, multiple ssl termination only works on docker 1.7.0 or higher, or in Tutum
+**Attention**: there was a bug that if an environment variable value contains "=", which is common in the `SSL_CERT`, docker skips that environment variable. As a result, multiple ssl termination only works on docker 1.7.0 or higher, or in Tutum.
 
 SSL termination is enabled when:
 
@@ -145,6 +158,37 @@ There are tree method to setup affinity and sticky session:
 2. set `COOKIE=<value>`. use application cookie to determine which server a client should connect to. Possible value of `<value>` could be `SRV insert indirect nocache`
 
 Check [HAProxy:appsession](http://cbonte.github.io/haproxy-dconv/configuration-1.5.html#4-appsession) and [HAProxy:cookie](http://cbonte.github.io/haproxy-dconv/configuration-1.5.html#4-cookie) for more information.
+
+
+TCP load balancing
+------------------
+
+By default, `tutum/haproxy` runs in `http` mode. If you want a linked service to run in a `tcp` mode, you can specify the environment variable `TCP_PORTS`, which is a comma separated ports(e.g. 9000, 9001).
+
+For example, if you run:
+
+	docker --name app-1 --expose 9000 --expose 9001 -e TCP_PORTS="9000, 9001" your_app
+	docker --name app-2 --expose 9000 --expose 9001 -e TCP_PORTS="9000, 9001" your_app
+	docker run --link app-1:app-1 --link app-2:app-2 -p 9000:9000, 9001:9001 tutum/haproxy
+
+Then, haproxy balances the load between `app-1` and `app-2` in both port `9000` and `9001` respectively.
+
+Moreover, If you have more exposed ports than `TCP_PORTS`, the rest of the ports will be balancing using `http` mode.
+
+For example, if you run:
+
+	docker --name app-1 --expose 80 --expose 22 -e TCP_PORTS=22 your_app
+	docker --name app-2 --expose 80 --expose 22 -e TCP_PORTS=22 your_app
+	docker run --link app-1:app-2 --link app-2:app-2 -p 80:80 -p 22:22 tutum/haproxy
+
+Then, haproxy balances in `http` mode at port `80` and balances in `tcp` on port at port `22`.
+
+In this way, you can do the load balancing both in `tcp` and in `http` at the same time.
+
+Note:
+
+1. You are able to set `VIRTUAL_HOST` and `TCP_PORTS` at the same them, giving more control on `http` mode.
+2. Be careful that, the load balancing on `tcp` port is applied to all the services. If you link two(or more) different services using the same `TCP_PORTS`, `tutum/haproxy` considers them coming from the same service.
 
 
 Usage within Tutum
@@ -253,21 +297,21 @@ Topologies using virtual hosts
 
 Within Tutum:
 
-                                                         |---- container 1
-                                  |----- service 1 ----- |---- container 2
-                                  |   (virtual host 1)   |---- container 3
+                                                         |---- container_a1
+                                  |----- service_a ----- |---- container_a2
+                                  |   (virtual host a)   |---- container_a3
     internet --- tutum/haproxy--- |
-                                  |                      |---- container a
-                                  |----- service 2 ----- |---- container b
-                                      (virtual host 2)   |---- container c
+                                  |                      |---- container_b1
+                                  |----- service_b ----- |---- container_b2
+                                      (virtual host b)   |---- container_b3
 
 
 Outside Tutum (any Docker server):
 
-                                  |---- container 1 (virtual host 1)
-                                  |---- container 2 (virtual host 1)
-                                  |---- container 3 (virtual host 1)
+                                  |---- container_a1 (virtual host a) ---|
+                                  |---- container_a2 (virtual host a) ---|---logic service_a
+                                  |---- container_a3 (virtual host a) ---|
     internet --- tutum/haproxy--- |
-                                  |---- container a (virtual host 2)
-                                  |---- container b (virtual host 2)
-                                  |---- container c (virtual host 2)
+                                  |---- container_b1 (virtual host b) ---|
+                                  |---- container_b2 (virtual host b) ---|---logic service_b
+                                  |---- container_b3 (virtual host b) ---|

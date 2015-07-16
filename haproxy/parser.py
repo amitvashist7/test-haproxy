@@ -12,6 +12,7 @@ def parse_uuid_from_resource_uri(uri):
 
 class Specs(object):
     service_alias_match = re.compile(r"_PORT_\d{1,5}_(TCP|UDP)$")
+    detailed_service_alias_match = re.compile(r"_\d+_PORT_\d{1,5}_(TCP|UDP)$")
 
     def __init__(self, tutum_haproxy_container=None, tutum_haproxy_service=None):
         self.envvars = self._parse_envvars(tutum_haproxy_container)
@@ -38,17 +39,30 @@ class Specs(object):
             for key, value in self.envvars.iteritems():
                 match = Specs.service_alias_match.search(key)
                 if match:
-                    service_aliases.append(key[:match.start()])
+                    detailed_match = Specs.detailed_service_alias_match.search(key)
+                    if detailed_match:
+                        alias = key[:detailed_match.start()]
+                    else:
+                        alias = key[:match.start()]
+
+                    if alias not in service_aliases:
+                        service_aliases.append(alias)
         return service_aliases
 
     def _parse_details(self):
         env_parser = EnvParser(self.service_aliases)
         for key, value in self.envvars.iteritems():
             env_parser.parse(key, value)
+        details = env_parser.get_details()
+
+        # generate empty details if there is no environment variables set in the application services
+        for service_alias in set(self.service_aliases) - set(details.iterkeys()):
+            env_parser.parse(service_alias + "_ENV_", "")
+
         return env_parser.get_details()
 
     def _parse_routes(self, tutum_haproxy_container):
-        return RouteParser.parse(self.details, tutum_haproxy_container)
+        return RouteParser.parse(self.details, self.service_aliases, tutum_haproxy_container)
 
     def _parse_vhosts(self):
         vhosts = []
@@ -72,7 +86,8 @@ class Specs(object):
 
     def get_default_ssl_cert(self):
         if not hasattr(self, "default_ssl_cert"):
-            self.default_ssl_cert = filter(lambda x: x, [attr["default_ssl_cert"] for attr in self.details.itervalues()])
+            self.default_ssl_cert = filter(lambda x: x,
+                                           [attr["default_ssl_cert"] for attr in self.details.itervalues()])
         return self.default_ssl_cert
 
     def get_ssl_cert(self):
@@ -94,14 +109,14 @@ class RouteParser(object):
     service_alias_match = re.compile(r"_PORT_\d{1,5}_(TCP|UDP)$")
 
     @staticmethod
-    def parse(specs, tutum_haproxy_container=None):
+    def parse(details, services_alias, tutum_haproxy_container=None):
         if tutum_haproxy_container:
-            return RouteParser.parse_tutum_routes(specs, tutum_haproxy_container.linked_to_container)
+            return RouteParser.parse_tutum_routes(details, tutum_haproxy_container.linked_to_container)
         else:
-            return RouteParser.parse_local_routes(specs, os.environ)
+            return RouteParser.parse_local_routes(details, services_alias, os.environ)
 
     @staticmethod
-    def parse_tutum_routes(specs, container_links):
+    def parse_tutum_routes(details, container_links):
         # Input:  settings        = {'HELLO_1': {'exclude_ports': ['3306']}}
         #         container_links = [{"endpoints": {"80/tcp": "tcp://10.7.0.3:80", "3306/tcp": "tcp://10.7.0.8:3306"},
         #                             "name": "hello-1",
@@ -122,7 +137,7 @@ class RouteParser(object):
                 for _, value in container_link.get("endpoints", {}).iteritems():
                     route = RouteParser.backend_match.match(value).groupdict()
                     route.update({"container_name": container_name})
-                    exclude_ports = specs.get(service_alias, {}).get("exclude_ports")
+                    exclude_ports = details.get(service_alias, {}).get("exclude_ports")
                     if not exclude_ports or (exclude_ports and route["port"] not in exclude_ports):
                         if service_alias in routes:
                             routes[service_alias].append(route)
@@ -131,7 +146,7 @@ class RouteParser(object):
         return routes
 
     @staticmethod
-    def parse_local_routes(specs, envvars):
+    def parse_local_routes(details, service_aliases, envvars):
         # Input:  settings = {'HELLO_1': {'exclude_ports': [3306]}}
         #         envvars  = {'HELLO_1_PORT_80_TCP': 'tcp://172.17.0.30:80',
         #                    'HELLO_2_PORT_80_TCP': 'tcp://172.17.0.31:80',
@@ -146,14 +161,27 @@ class RouteParser(object):
                 continue
             alias_match = RouteParser.service_alias_match.search(key)
             if alias_match:
-                service_alias = key[:alias_match.start()]
+                service_alias = ""
+                container_alias = key[:alias_match.start()]
+                for _sevices_alias in service_aliases:
+                    if container_alias.startswith(_sevices_alias):
+                        service_alias = _sevices_alias
+                        break
+
                 be_match = RouteParser.backend_match.match(value)
                 if be_match:
                     route = RouteParser.backend_match.match(value).groupdict()
-                    route.update({"container_name": service_alias})
-                    exclude_ports = specs.get(service_alias, {}).get("exclude_ports")
+
+                    route.update({"container_name": container_alias})
+                    exclude_ports = details.get(service_alias, {}).get("exclude_ports")
                     if not exclude_ports or (exclude_ports and route["port"] not in exclude_ports):
                         if service_alias in routes:
+                            # Avoid add the dulicated route twice(remove the first one, which is inject as the service name
+                            for _route in routes[service_alias]:
+                                if route['proto'] == _route['proto'] and \
+                                                route['port'] == _route['port'] and \
+                                                route['addr'] == _route['addr']:
+                                    routes[service_alias].remove(_route)
                             routes[service_alias].append(route)
                         else:
                             routes[service_alias] = [route]
@@ -165,7 +193,7 @@ class EnvParser(object):
 
     def __init__(self, service_aliases):
         self.service_aliases = service_aliases
-        self.specs = {}
+        self.details = {}
 
     def parse(self, key, value):
         for method in self.__class__.__dict__:
@@ -179,32 +207,36 @@ class EnvParser(object):
                             if key.endswith("_ENV_%s" % attr_name.upper()):
                                 attr_value = getattr(self, method)(value)
                             else:
-                                attr_value = None
+                                attr_value = getattr(self, method)(None)
 
-                            if service_alias in self.specs:
-                                if attr_name in self.specs[service_alias]:
+                            if service_alias in self.details:
+                                if attr_name in self.details[service_alias]:
                                     if attr_value:
-                                        self.specs[service_alias][attr_name] = attr_value
+                                        self.details[service_alias][attr_name] = attr_value
                                 else:
-                                    self.specs[service_alias][attr_name] = attr_value
+                                    self.details[service_alias][attr_name] = attr_value
                             else:
-                                self.specs[service_alias] = {attr_name: attr_value}
+                                self.details[service_alias] = {attr_name: attr_value}
 
     def get_details(self):
-        return self.specs
+        return self.details
 
     @staticmethod
     def parse_default_ssl_cert(value):
-        return value.replace(r'\n', '\n')
+        if value:
+            return value.replace(r'\n', '\n')
+        return ""
 
     @staticmethod
     def parse_ssl_cert(value):
-        return value.replace(r'\n', '\n')
+        return EnvParser.parse_default_ssl_cert(value)
 
     @staticmethod
     def parse_exclude_ports(value):
         # '3306, 8080' => ['3306', '8080']
-        return [x.strip() for x in value.strip().split(",")]
+        if value:
+            return [x.strip() for x in value.strip().split(",")]
+        return []
 
     @staticmethod
     def parse_virtual_host(value):
@@ -212,6 +244,9 @@ class EnvParser(object):
         #   [{'path': '', 'host': 'a.com', 'scheme': 'http', 'port': '8080'},
         #    {'path': '', 'host': 'b.com', 'scheme': 'https', 'port': '443'},
         #    {'path': '', 'host': 'c.com', 'scheme': 'http', 'port': '80'}]
+        if not value:
+            return []
+
         vhosts = []
         for h in [h.strip() for h in value.strip().split(",")]:
             pr = urlparse.urlparse(h)
@@ -244,3 +279,10 @@ class EnvParser(object):
     @staticmethod
     def parse_cookie(value):
         return value
+
+    @staticmethod
+    def parse_tcp_ports(value):
+        # '9000, 22' => ['9000', '22']
+        if value:
+            return [p.strip() for p in value.strip().split(",") if p.strip()]
+        return []

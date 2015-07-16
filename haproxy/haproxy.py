@@ -47,6 +47,8 @@ class Haproxy(object):
     def __init__(self):
         self.ssl = None
         self.ssl_updated = False
+        self.routes_added = []
+        self.require_default_route = False
         if Haproxy.cls_container_uri and Haproxy.cls_service_uri and Haproxy.cls_tutum_auth:
             logger.info("Loading HAProxy definition through REST API")
             container = self.fetch_tutum_obj(Haproxy.cls_container_uri)
@@ -62,6 +64,8 @@ class Haproxy(object):
         cfg_dict = OrderedDict()
         self._config_ssl()
         cfg_dict.update(self._config_default())
+        for cfg in self._config_tcp():
+            cfg_dict.update(cfg)
         cfg_dict.update(self._config_frontend())
         cfg_dict.update(self._config_backend())
 
@@ -184,6 +188,35 @@ class Haproxy(object):
             cfg["global"].append("ssl-default-bind-ciphers %s" % cls.envvar_ssl_bind_ciphers)
         return cfg
 
+    def _config_tcp(self):
+        cfgs = []
+        if not self._get_service_attr("tcp_ports"):
+            return cfgs
+
+        ports = []
+        for service_alias in self.specs.service_aliases:
+            _ports = self._get_service_attr("tcp_ports", service_alias)
+            if _ports:
+                ports.extend(_ports)
+
+        for port in set(ports):
+            cfg = OrderedDict()
+            listen = ["bind :%s" % port, "mode tcp"]
+            for _service_alias, routes in self.specs.get_routes().iteritems():
+                _ports = self._get_service_attr("tcp_ports", _service_alias)
+                if _ports and port in self._get_service_attr("tcp_ports", _service_alias):
+                    for route in routes:
+                        if route["port"] in self._get_service_attr("tcp_ports", _service_alias) and \
+                                        route["port"] == port:
+                            tcp_route = "server %s %s:%s" % (route["container_name"], route["addr"], route["port"])
+                            listen.append(tcp_route)
+                            self.routes_added.append(route)
+
+            cfg["listen port_%s" % port] = listen
+            cfgs.append(cfg)
+
+        return cfgs
+
     def _config_frontend(self):
         cfg = OrderedDict()
         if self.specs.get_vhosts():
@@ -238,28 +271,38 @@ class Haproxy(object):
                     if len(host_acl) > 2 and len(path_acl) > 2:
                         acl_condition = "host_rule_%d path_rule_%d" % (rule_counter, rule_counter)
                         acl_rule = [" ".join(host_acl), " ".join(path_acl),
-                                "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
+                                    "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
                     elif len(host_acl) > 2:
                         acl_condition = "host_rule_%d" % rule_counter
                         acl_rule = [" ".join(host_acl),
-                                "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
+                                    "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
                     elif len(path_acl) > 2:
                         acl_condition = "path_rule_%d" % rule_counter
                         acl_rule = [" ".join(path_acl),
-                                "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
+                                    "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
 
                     frontends_dict[port].extend(acl_rule)
+
             for port, frontend in frontends_dict.iteritems():
                 cfg["frontend port_%s" % port] = frontend
+
         else:
-            frontend = ["bind :80"]
-            if self.ssl:
-                frontend.append("bind :443 %s" % self.ssl)
-                frontend.append("reqadd X-Forwarded-Proto:\ https")
-                if self.specs.get_force_ssl():
-                    frontend.append("redirect scheme https code 301 if !{ ssl_fc }")
-            frontend.append("default_backend default_service")
-            cfg["frontend default_frontend"] = frontend
+            all_routes = []
+            for routes in self.specs.get_routes().itervalues():
+                all_routes.extend(routes)
+            if len(self.routes_added) < len(all_routes):
+                self.require_default_route = True
+
+            if self.require_default_route:
+                frontend = ["bind :80"]
+                if self.ssl and self:
+                    frontend.append("bind :443 %s" % self.ssl)
+                    frontend.append("reqadd X-Forwarded-Proto:\ https")
+                    if self.specs.get_force_ssl():
+                        frontend.append("redirect scheme https code 301 if !{ ssl_fc }")
+                frontend.append("default_backend default_service")
+                cfg["frontend default_frontend"] = frontend
+
         return cfg
 
     def _config_backend(self):
@@ -297,29 +340,38 @@ class Haproxy(object):
             for _service_alias, routes in self.specs.get_routes().iteritems():
                 if not service_alias or _service_alias == service_alias:
                     for route in routes:
+                        # avoid adding those tcp routes adding http backends
+                        if route in self.routes_added:
+                            continue
+
                         backend_route = "server %s %s:%s" % (route["container_name"], route["addr"], route["port"])
                         if is_sticky:
                             backend_route = " ".join([backend_route, "cookie %s" % route["container_name"]])
                         backend.append(backend_route)
 
             if not service_alias:
-                cfg["backend default_service"] = sorted(backend)
+                if self.require_default_route:
+                    cfg["backend default_service"] = sorted(backend)
             else:
-                cfg["backend SERVICE_%s" % service_alias] = sorted(backend)
+                if self._get_service_attr("virtual_host", _service_alias):
+                    cfg["backend SERVICE_%s" % service_alias] = sorted(backend)
+                else:
+                    cfg["backend default_service"] = sorted(backend)
         return cfg
 
-    def _get_service_attr(self, attr_name, service_alias):
+    def _get_service_attr(self, attr_name, service_alias=None):
         # service is None, when there is no virtual host is set
         if service_alias:
             try:
                 return self.specs.get_details()[service_alias][attr_name]
             except:
                 return None
+
         else:
             # Randomly pick a None value from the linked service
-            for service_alias in self.specs.get_details().iterkeys():
-                if self.specs.get_details()[service_alias][attr_name]:
-                    return self.specs.get_details()[service_alias][attr_name]
+            for _service_alias in self.specs.get_details().iterkeys():
+                if self.specs.get_details()[_service_alias][attr_name]:
+                    return self.specs.get_details()[_service_alias][attr_name]
             return None
 
     @classmethod
