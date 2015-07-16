@@ -42,7 +42,7 @@ ENV SSL_CERT **None**
 ENV SSL_BIND_OPTIONS no-sslv3
 
 # Add scripts
-ADD /haproxy /haproxy
+ADD haproxy /haproxy
 ADD run.sh /
 
 EXPOSE 80 443 1936

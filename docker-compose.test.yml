@@ -1,0 +1,9 @@
+sut:
+  build: .
+  dockerfile: Dockerfile-test
+  environment:
+    - DOCKER_USER
+    - DOCKER_PASS
+    - TUTUM_USER
+    - TUTUM_APIKEY
+  privileged: true
