@@ -24,6 +24,7 @@ class Haproxy(object):
     envvar_stats_auth = os.getenv("STATS_AUTH", "stats:stats")
     envvar_stats_port = os.getenv("STATS_PORT", "1936")
     envvar_timeout = os.getenv("TIMEOUT", "connect 5000, client 50000, server 50000").split(",")
+    envvar_health_check = os.getenv("HEALTH_CHECK", "check inter 2000 rise 2 fall 3")
 
     # envvar overwritable
     envvar_balance = os.getenv("BALANCE", "roundrobin")
@@ -208,8 +209,13 @@ class Haproxy(object):
                     for route in routes:
                         if route["port"] in self._get_service_attr("tcp_ports", _service_alias) and \
                                         route["port"] == port:
-                            tcp_route = "server %s %s:%s" % (route["container_name"], route["addr"], route["port"])
-                            listen.append(tcp_route)
+                            tcp_route = ["server %s %s:%s" % (route["container_name"], route["addr"], route["port"])]
+
+                            health_check = self._get_service_attr("health_check", _service_alias)
+                            health_check = health_check if health_check else Haproxy.envvar_health_check
+                            tcp_route.append(health_check)
+
+                            listen.append(" ".join(tcp_route))
                             self.routes_added.append(route)
 
             cfg["listen port_%s" % port] = listen
@@ -344,16 +350,21 @@ class Haproxy(object):
                         if route in self.routes_added:
                             continue
 
-                        backend_route = "server %s %s:%s" % (route["container_name"], route["addr"], route["port"])
+                        backend_route = ["server %s %s:%s" % (route["container_name"], route["addr"], route["port"])]
                         if is_sticky:
-                            backend_route = " ".join([backend_route, "cookie %s" % route["container_name"]])
-                        backend.append(backend_route)
+                            backend_route.append("cookie %s" % route["container_name"])
+
+                        health_check = self._get_service_attr("health_check", service_alias)
+                        health_check = health_check if health_check else Haproxy.envvar_health_check
+                        backend_route.append(health_check)
+
+                        backend.append(" ".join(backend_route))
 
             if not service_alias:
                 if self.require_default_route:
                     cfg["backend default_service"] = sorted(backend)
             else:
-                if self._get_service_attr("virtual_host", _service_alias):
+                if self._get_service_attr("virtual_host", service_alias):
                     cfg["backend SERVICE_%s" % service_alias] = sorted(backend)
                 else:
                     cfg["backend default_service"] = sorted(backend)
