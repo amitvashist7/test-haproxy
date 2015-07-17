@@ -50,7 +50,7 @@ Settings in this part is immutable, you have to redeploy HAProxy service to make
 |env var|default|description|
 |:-----:|:-----:|:----------|
 |DEFAULT_SSL_CERT||Default ssl cert, a pem file with private key followed by public certificate, '\n'(two chars) as the line separator.|
-|BALANCE|roundrobin|load balancing algorithm to use. Possible values include: `roundrobin`, `static-rr`, `source`, `leastconn`|
+|BALANCE|roundrobin|load balancing algorithm to use. Possible values include: `roundrobin`, `static-rr`, `source`, `leastconn`. See:[HAProxy:balance](https://cbonte.github.io/haproxy-dconv/configuration-1.5.html#4-balance)|
 |MODE|http|mode of load balancing for HAProxy. Possible values include: `http`, `tcp`, `health`|
 |MAXCONN|4096|sets the maximum per-process number of concurrent connections.|
 |OPTION|redispatch|comma-separated list of HAProxy `option` entries to the `default` section.|
@@ -59,7 +59,8 @@ Settings in this part is immutable, you have to redeploy HAProxy service to make
 |SSL_BIND_CIPHERS||explicitly set which SSL ciphers will be used for the SSL server. This sets the HAProxy `ssl-default-bind-ciphers` configuration setting.|
 |STATS_PORT|1936|port for the HAProxy stats section. If this port is published, stats can be accessed at `http://<host-ip>:<STATS_PORT>/`
 |STATS_AUTH|stats:stats|username and password required to access the Haproxy stats.|
-|TIMEOUT|connect 5000,client 50000,server 50000|comma-separated list of HAProxy `timeout` entries to the `default` section.|
+|TIMEOUT|connect 5000, client 50000, server 50000|comma-separated list of HAProxy `timeout` entries to the `default` section.|
+|HEALTH_CHECK|check|set health check on each backend route, possible value: "check inter 2000 rise 2 fall 3". See:[HAProxy:check](https://cbonte.github.io/haproxy-dconv/configuration-1.5.html#5.2-check)|
 
 ###Settings in linked application services###
 
@@ -67,15 +68,17 @@ Settings here can overwrite the settings in HAProxy, which are only applied to t
 
 |env var|description|
 |:-----:|:----------|
-|APPSESSION|sticky session option. possible value `JSESSIONID len 52 timeout 3h`|
-|COOKIE|sticky session option. possible value `SRV insert indirect nocache`|
+|APPSESSION|sticky session option. possible value `JSESSIONID len 52 timeout 3h`. See:[HAProxy:appsession](http://cbonte.github.io/haproxy-dconv/configuration-1.5.html#4-appsession)|
+|COOKIE|sticky session option. possible value `SRV insert indirect nocache`. See:[HAProxy:cookie](http://cbonte.github.io/haproxy-dconv/configuration-1.5.html#4-cookie)|
 |SSL_CERT|ssl cert, a pem file with private key followed by public certificate, '\n'(two chars) as the line separator|
 |DEFAULT_SSL_CERT|similar to SSL_CERT, but stores the pem file at `/certs/cert0.pem` as the default ssl certs. If multiple `DEFAULT_SSL_CERT` are specified in linked services and HAProxy, the behavior is undefined|
 |EXCLUDE_PORTS|comma separated port numbers(e.g. 3306, 3307). By default, HAProxy will add all the ports exposed by the application services to the backend routes. You can exclude the ports that you don't want to be routed, like database port|
 |TCP_PORTS|comma separated port mumbers(e.g. 9000, 9001). The port listed in `TCP_PORTS` will be load-balanced in TCP mode.
-|BALANCE|load balancing algorithm to use. Possible values include: `roundrobin`, `static-rr`, `source`, `leastconn`|
+|BALANCE|load balancing algorithm to use. Possible values include: `roundrobin`, `static-rr`, `source`, `leastconn`. See:[HAProxy:balance](https://cbonte.github.io/haproxy-dconv/configuration-1.5.html#4-balance)|
 |FORCE_SSL|if set(any value) together with ssl termination enabled. HAProxy will redirect HTTP request to HTTPS request.
 |VIRTUAL_HOST|specify virtual host and virtual path. Format: `[scheme://]domain[:port][/path], ...`. wildcard `*` can be used in `domain` and `path` part|
+|HEALTH_CHECK|set health check on each backend route, possible value: "check inter 2000 rise 2 fall 3". See:[HAProxy:check](https://cbonte.github.io/haproxy-dconv/configuration-1.5.html#5.2-check)|
+|HTTP_CHECK|enable HTTP protocol to check on the servers health, possible value: "OPTIONS * HTTP/1.1\r\nHost:\ www". See:[HAProxy:httpchk](https://cbonte.github.io/haproxy-dconv/configuration-1.5.html#4-option%20httpchk)|
 
 Check [the HAProxy configuration manual](http://cbonte.github.io/haproxy-dconv/configuration-1.5.html) for more information on the above.
 
