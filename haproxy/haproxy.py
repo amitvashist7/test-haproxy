@@ -343,6 +343,10 @@ class Haproxy(object):
             if force_ssl:
                 backend.append("redirect scheme https code 301 if !{ ssl_fc }")
 
+            http_check = self._get_service_attr("http_check", service_alias)
+            if http_check:
+                backend.append("option httpchk %s" % http_check)
+
             for _service_alias, routes in self.specs.get_routes().iteritems():
                 if not service_alias or _service_alias == service_alias:
                     for route in routes:
