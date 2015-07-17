@@ -290,3 +290,7 @@ class EnvParser(object):
     @staticmethod
     def parse_health_check(value):
         return value
+
+    @staticmethod
+    def parse_http_check(value):
+        return value
