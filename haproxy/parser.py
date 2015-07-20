@@ -73,7 +73,11 @@ class Specs(object):
                 for vhost in virtual_hosts:
                     vhost["service_alias"] = service_alias
                     vhosts.append(vhost)
-        return vhosts
+        try:
+            return sorted(vhosts, key=lambda vhost: self.details[vhost["service_alias"]]["virtual_host_weight"],
+                          reverse=True)
+        except:
+            vhosts
 
     def get_details(self):
         return self.details
@@ -190,6 +194,7 @@ class RouteParser(object):
 
 class EnvParser(object):
     service_alias_match = re.compile(r"_ENV_")
+    detailed_service_match = re.compile(r"_\d+_ENV")
 
     def __init__(self, service_aliases):
         self.service_aliases = service_aliases
@@ -200,23 +205,27 @@ class EnvParser(object):
             if method.startswith("parse_"):
                 match = EnvParser.service_alias_match.search(key)
                 if match:
-                    container_alias = key[:match.start()]
-                    for service_alias in self.service_aliases:
-                        if container_alias.startswith(service_alias):
-                            attr_name = method[6:]
-                            if key.endswith("_ENV_%s" % attr_name.upper()):
-                                attr_value = getattr(self, method)(value)
-                            else:
-                                attr_value = getattr(self, method)(None)
+                    detailed_match = EnvParser.detailed_service_match.search(key)
+                    if detailed_match:
+                        service_alias = key[:detailed_match.start()]
+                    else:
+                        service_alias = key[:match.start()]
 
-                            if service_alias in self.details:
-                                if attr_name in self.details[service_alias]:
-                                    if attr_value:
-                                        self.details[service_alias][attr_name] = attr_value
-                                else:
+                    if service_alias in self.service_aliases:
+                        attr_name = method[6:]
+                        if key.endswith("_ENV_%s" % attr_name.upper()):
+                            attr_value = getattr(self, method)(value)
+                        else:
+                            attr_value = getattr(self, method)(None)
+
+                        if service_alias in self.details:
+                            if attr_name in self.details[service_alias]:
+                                if attr_value:
                                     self.details[service_alias][attr_name] = attr_value
                             else:
-                                self.details[service_alias] = {attr_name: attr_value}
+                                self.details[service_alias][attr_name] = attr_value
+                        else:
+                            self.details[service_alias] = {attr_name: attr_value}
 
     def get_details(self):
         return self.details
@@ -294,3 +303,10 @@ class EnvParser(object):
     @staticmethod
     def parse_http_check(value):
         return value
+
+    @staticmethod
+    def parse_virtual_host_weight(value):
+        try:
+            return int(value)
+        except:
+            return 0
