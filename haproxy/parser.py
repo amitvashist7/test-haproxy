@@ -62,7 +62,7 @@ class Specs(object):
         return env_parser.get_details()
 
     def _parse_routes(self, tutum_haproxy_container):
-        return RouteParser.parse(self.details, self.service_aliases, tutum_haproxy_container)
+        return RouteParser.parse(self.details, tutum_haproxy_container)
 
     def _parse_vhosts(self):
         vhosts = []
@@ -111,13 +111,14 @@ class Specs(object):
 class RouteParser(object):
     backend_match = re.compile(r"(?P<proto>tcp|udp):\/\/(?P<addr>[^:]*):(?P<port>.*)")
     service_alias_match = re.compile(r"_PORT_\d{1,5}_(TCP|UDP)$")
+    detailed_service_alias_match = re.compile(r"_\d+_PORT_\d{1,5}_(TCP|UDP)$")
 
     @staticmethod
-    def parse(details, services_alias, tutum_haproxy_container=None):
+    def parse(details, tutum_haproxy_container=None):
         if tutum_haproxy_container:
             return RouteParser.parse_tutum_routes(details, tutum_haproxy_container.linked_to_container)
         else:
-            return RouteParser.parse_local_routes(details, services_alias, os.environ)
+            return RouteParser.parse_local_routes(details, os.environ)
 
     @staticmethod
     def parse_tutum_routes(details, container_links):
@@ -150,7 +151,7 @@ class RouteParser(object):
         return routes
 
     @staticmethod
-    def parse_local_routes(details, service_aliases, envvars):
+    def parse_local_routes(details, envvars):
         # Input:  settings = {'HELLO_1': {'exclude_ports': [3306]}}
         #         envvars  = {'HELLO_1_PORT_80_TCP': 'tcp://172.17.0.30:80',
         #                    'HELLO_2_PORT_80_TCP': 'tcp://172.17.0.31:80',
@@ -163,20 +164,21 @@ class RouteParser(object):
         for key, value in envvars.iteritems():
             if not key or not value:
                 continue
-            alias_match = RouteParser.service_alias_match.search(key)
-            if alias_match:
-                service_alias = ""
-                container_alias = key[:alias_match.start()]
-                for _sevices_alias in service_aliases:
-                    if container_alias.startswith(_sevices_alias):
-                        service_alias = _sevices_alias
-                        break
+            match = RouteParser.service_alias_match.search(key)
+            if match:
+                detailed_match = EnvParser.detailed_service_match.search(key)
+                if detailed_match:
+                    service_alias = key[:detailed_match.start()]
+                else:
+                    service_alias = key[:match.start()]
+
+                container_name = key[:match.start()]
 
                 be_match = RouteParser.backend_match.match(value)
                 if be_match:
                     route = RouteParser.backend_match.match(value).groupdict()
 
-                    route.update({"container_name": container_alias})
+                    route.update({"container_name": container_name})
                     exclude_ports = details.get(service_alias, {}).get("exclude_ports")
                     if not exclude_ports or (exclude_ports and route["port"] not in exclude_ports):
                         if service_alias in routes:
