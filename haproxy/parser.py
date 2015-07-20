@@ -291,7 +291,7 @@ class EnvParser(object):
 
     @staticmethod
     def parse_tcp_ports(value):
-        # '9000, 22' => ['9000', '22']
+        # '9000, 22/ssl' => ['9000', '22/ssl']
         if value:
             return [p.strip() for p in value.strip().split(",") if p.strip()]
         return []

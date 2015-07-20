@@ -196,19 +196,30 @@ class Haproxy(object):
 
         ports = []
         for service_alias in self.specs.service_aliases:
-            _ports = self._get_service_attr("tcp_ports", service_alias)
-            if _ports:
-                ports.extend(_ports)
+            tcp_ports = self._get_service_attr("tcp_ports", service_alias)
+            if tcp_ports:
+                ports.extend(tcp_ports)
 
         for port in set(ports):
             cfg = OrderedDict()
-            listen = ["bind :%s" % port, "mode tcp"]
+
+            ssl = False
+            port_num = port
+            if port.lower().endswith("/ssl"):
+                port_num = port[:-4]
+                if self.ssl:
+                    ssl = True
+
+            if ssl:
+                listen = ["bind :%s %s" % (port_num, self.ssl), "mode tcp"]
+            else:
+                listen = ["bind :%s" % port, "mode tcp"]
+
             for _service_alias, routes in self.specs.get_routes().iteritems():
-                _ports = self._get_service_attr("tcp_ports", _service_alias)
-                if _ports and port in self._get_service_attr("tcp_ports", _service_alias):
+                tcp_ports = self._get_service_attr("tcp_ports", _service_alias)
+                if tcp_ports and port in tcp_ports:
                     for route in routes:
-                        if route["port"] in self._get_service_attr("tcp_ports", _service_alias) and \
-                                        route["port"] == port:
+                        if route["port"] == port_num:
                             tcp_route = ["server %s %s:%s" % (route["container_name"], route["addr"], route["port"])]
 
                             health_check = self._get_service_attr("health_check", _service_alias)
@@ -218,7 +229,7 @@ class Haproxy(object):
                             listen.append(" ".join(tcp_route))
                             self.routes_added.append(route)
 
-            cfg["listen port_%s" % port] = listen
+            cfg["listen port_%s" % port_num] = listen
             cfgs.append(cfg)
 
         return cfgs
