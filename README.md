@@ -79,6 +79,7 @@ Settings here can overwrite the settings in HAProxy, which are only applied to t
 |VIRTUAL_HOST|specify virtual host and virtual path. Format: `[scheme://]domain[:port][/path], ...`. wildcard `*` can be used in `domain` and `path` part|
 |HEALTH_CHECK|set health check on each backend route, possible value: "check inter 2000 rise 2 fall 3". See:[HAProxy:check](https://cbonte.github.io/haproxy-dconv/configuration-1.5.html#5.2-check)|
 |HTTP_CHECK|enable HTTP protocol to check on the servers health, possible value: "OPTIONS * HTTP/1.1\r\nHost:\ www". See:[HAProxy:httpchk](https://cbonte.github.io/haproxy-dconv/configuration-1.5.html#4-option%20httpchk)|
+|VIRTUAL_HOST_WEIGHT|an integer of the weight of an virtual host, used together with `VIRTUAL_HOST`, default:0. It affects the order of acl rules of the virtual hosts. The higher weight one virtual host has, the more priority that acl rules applies.|
 
 Check [the HAProxy configuration manual](http://cbonte.github.io/haproxy-dconv/configuration-1.5.html) for more information on the above.
 
@@ -119,6 +120,8 @@ Both virtual host and virtual path can be specified in environment variable `VIR
 |\*.example.com/\*.jpg|www.example.com/abc.jpg, abc.exampe.com/123.jpg|example.com/abc.jpg|
 |\*/path, \*/path/|example.com/path, example.org/path/||
 |example.com:90, https://example.com|example.com:90, https://example.com||
+
+Note: The sequence of the acl rules generated based on VIRTUAL_HOST are randomly. In HAProxy, when an acl rule with a wide scope(e.g. *.example.com) is put before a rule with narrow scope(e.g. web.example.com), the narrow rule will never be reached. As a result, if the virtual hosts you set have overlapping scopes, you need to use `VIRTUAL_HOST_WEIGHT` to manually set the order of acl rules, namely, giving the narrow virtual host a higher weight than the wide one.
 
 SSL termination
 ---------------
@@ -272,6 +275,12 @@ When you access `http://www.webapp1.com`, it will show the service running in co
 
     docker run -d -e VIRTUAL_HOST="*.node.io" --name webapp tutum/hello-world
     docker run -d --link webapp:webapp -p 80:80 tutum/haproxy
+
+#### I want `web.example.com` go to one service and `*.example.com` go to another service
+
+    docker run -d -e VIRTUAL_HOST="web.example.com" -e VIRTUAL_HOST_WEIGHT=1 --name webapp tutum/hello-world
+    docker run -d -e VIRTUAL_HOST="*.example.com" -e VIRTUAL_HOST_WEIGHT=0 --name app tutum/hello-world
+    docker run -d --link webapp:webapp --link app:app -p 80:80 tutum/haproxy
 
 ##### I want all the requests to path `/path` point to my service
 

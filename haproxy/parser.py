@@ -73,7 +73,10 @@ class Specs(object):
                 for vhost in virtual_hosts:
                     vhost["service_alias"] = service_alias
                     vhosts.append(vhost)
-        return vhosts
+        try:
+            return sorted(vhosts, key=lambda vhost: self.details[vhost["service_alias"]]["virtual_host_weight"], reverse=True)
+        except:
+            vhosts
 
     def get_details(self):
         return self.details
@@ -294,3 +297,10 @@ class EnvParser(object):
     @staticmethod
     def parse_http_check(value):
         return value
+
+    @staticmethod
+    def parse_virtual_host_weight(value):
+        try:
+            return int(value)
+        except:
+            return 0
