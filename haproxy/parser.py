@@ -166,7 +166,7 @@ class RouteParser(object):
                 continue
             match = RouteParser.service_alias_match.search(key)
             if match:
-                detailed_match = EnvParser.detailed_service_match.search(key)
+                detailed_match = RouteParser.detailed_service_alias_match.search(key)
                 if detailed_match:
                     service_alias = key[:detailed_match.start()]
                 else:
@@ -196,7 +196,7 @@ class RouteParser(object):
 
 class EnvParser(object):
     service_alias_match = re.compile(r"_ENV_")
-    detailed_service_match = re.compile(r"_\d+_ENV")
+    detailed_service_alias_match = re.compile(r"_\d+_ENV")
 
     def __init__(self, service_aliases):
         self.service_aliases = service_aliases
@@ -207,7 +207,7 @@ class EnvParser(object):
             if method.startswith("parse_"):
                 match = EnvParser.service_alias_match.search(key)
                 if match:
-                    detailed_match = EnvParser.detailed_service_match.search(key)
+                    detailed_match = EnvParser.detailed_service_alias_match.search(key)
                     if detailed_match:
                         service_alias = key[:detailed_match.start()]
                     else:
