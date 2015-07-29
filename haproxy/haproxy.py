@@ -358,6 +358,10 @@ class Haproxy(object):
             if http_check:
                 backend.append("option httpchk %s" % http_check)
 
+            hsts_max_age = self._get_service_attr("hsts_max_age", service_alias)
+            if hsts_max_age:
+                backend.append("rspadd Strict-Transport-Security:\ max-age=%s;\ includeSubDomains" % hsts_max_age)
+
             for _service_alias, routes in self.specs.get_routes().iteritems():
                 if not service_alias or _service_alias == service_alias:
                     for route in routes:

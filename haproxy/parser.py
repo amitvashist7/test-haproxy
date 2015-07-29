@@ -312,3 +312,7 @@ class EnvParser(object):
             return int(value)
         except:
             return 0
+
+    @staticmethod
+    def parse_hsts_max_age(value):
+        return value
