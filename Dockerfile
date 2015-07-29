@@ -8,7 +8,7 @@ RUN echo 'deb http://ppa.launchpad.net/vbernat/haproxy-1.5/ubuntu trusty main' >
     apt-get update && \
     apt-get install -y --no-install-recommends haproxy python-pip && \
     apt-get clean && \
-    pip install python-tutum==0.16.0 && \
+    pip install python-tutum==0.16.21 && \
     rm -rf /var/lib/apt/lists/*
 
 ENV RSYSLOG_DESTINATION=127.0.0.1 \
