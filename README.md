@@ -199,6 +199,13 @@ Note:
 1. You are able to set `VIRTUAL_HOST` and `TCP_PORTS` at the same them, giving more control on `http` mode.
 2. Be careful that, the load balancing on `tcp` port is applied to all the services. If you link two(or more) different services using the same `TCP_PORTS`, `tutum/haproxy` considers them coming from the same service.
 
+WebSocket support
+-----------------
+
+There are two ways to enable the support of websocket:
+
+1. As websocket starts using HTTP protocol, you can use virtual host to specify the scheme using `ws` or `wss`. For example, `-e VIRTUAL_HOST="ws://ws.example.com, wss://wss.example.com"
+2. Websocket itself is a TCP connection, you can also try the TCP load balancing mentioned in the previous section.
 
 Usage within Tutum
 ------------------
