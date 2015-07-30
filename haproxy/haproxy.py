@@ -28,7 +28,6 @@ class Haproxy(object):
 
     # envvar overwritable
     envvar_balance = os.getenv("BALANCE", "roundrobin")
-    envvar_appsession = os.getenv("APPSESSION")
 
     # const var
     const_cert_dir = "/certs/"
@@ -257,6 +256,9 @@ class Haproxy(object):
                     else:
                         frontends_dict[port] = ["bind :%s" % port]
 
+                # add websocket acl rule
+                frontends_dict[port].append("acl is_websocket hdr(Upgrade) -i WebSocket")
+
                 # calculate virtual host rule
                 host_acl = ["acl", "host_rule_%d" % rule_counter]
                 host = vhost["host"].strip("/")
@@ -287,6 +289,9 @@ class Haproxy(object):
                     service_alias = vhost["service_alias"]
                     if len(host_acl) > 2 and len(path_acl) > 2:
                         acl_condition = "host_rule_%d path_rule_%d" % (rule_counter, rule_counter)
+                        if vhost["scheme"].lower() in ["ws", "wss"]:
+                            acl_condition += " is_websocket"
+
                         acl_rule = [" ".join(host_acl), " ".join(path_acl),
                                     "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
                     elif len(host_acl) > 2:
@@ -315,8 +320,6 @@ class Haproxy(object):
                 if self.ssl and self:
                     frontend.append("bind :443 %s" % self.ssl)
                     frontend.append("reqadd X-Forwarded-Proto:\ https")
-                    if self.specs.get_force_ssl():
-                        frontend.append("redirect scheme https code 301 if !{ ssl_fc }")
                 frontend.append("default_backend default_service")
                 cfg["frontend default_frontend"] = frontend
 
@@ -333,6 +336,13 @@ class Haproxy(object):
         for service_alias in services_aliases:
             backend = []
             is_sticky = False
+
+            # Add http-service-close option for websocket backend
+            for v in self.specs.get_vhosts():
+                if service_alias == v["service_alias"]:
+                    if v["scheme"].lower() in ["ws", "wss"]:
+                        backend.append("option http-server-close")
+                        break
 
             # To add an entry to backend section: append to backend
             # To add items to a route: append to route_setting
