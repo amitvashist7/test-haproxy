@@ -372,6 +372,11 @@ class Haproxy(object):
             if hsts_max_age:
                 backend.append("rspadd Strict-Transport-Security:\ max-age=%s;\ includeSubDomains" % hsts_max_age)
 
+            gzip_compression_type = self._get_service_attr('gzip_compression_type', service_alias)
+            if gzip_compression_type:
+                backend.append("compression algo gzip")
+                backend.append("compression type %s" % gzip_compression_type)
+
             for _service_alias, routes in self.specs.get_routes().iteritems():
                 if not service_alias or _service_alias == service_alias:
                     for route in routes:
