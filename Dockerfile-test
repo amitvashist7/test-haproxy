@@ -6,7 +6,6 @@ RUN apt-get install -y --no-install-recommends make python-pip && \
 
 ADD haproxy /app/haproxy
 ADD Dockerfile /app/Dockerfile
-ADD run.sh /app/run.sh
 ADD Makefile /app/Makefile
 ADD run-test.sh /app/run-test.sh
 WORKDIR /app
