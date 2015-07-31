@@ -316,3 +316,7 @@ class EnvParser(object):
     @staticmethod
     def parse_hsts_max_age(value):
         return value
+
+    @staticmethod
+    def parse_gzip_compression_type(value):
+        return value
