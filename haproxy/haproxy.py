@@ -256,8 +256,8 @@ class Haproxy(object):
                     else:
                         frontends_dict[port] = ["bind :%s" % port]
 
-                # add websocket acl rule
-                frontends_dict[port].append("acl is_websocket hdr(Upgrade) -i WebSocket")
+                    # add websocket acl rule
+                    frontends_dict[port].append("acl is_websocket hdr(Upgrade) -i WebSocket")
 
                 # calculate virtual host rule
                 host_acl = ["acl", "host_rule_%d" % rule_counter]
