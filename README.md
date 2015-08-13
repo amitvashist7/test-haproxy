@@ -82,6 +82,7 @@ Settings here can overwrite the settings in HAProxy, which are only applied to t
 |VIRTUAL_HOST_WEIGHT|an integer of the weight of an virtual host, used together with `VIRTUAL_HOST`, default:0. It affects the order of acl rules of the virtual hosts. The higher weight one virtual host has, the more priority that acl rules applies.|
 |HSTS_MAX_AGE|enable HSTS. It is an integer representing the max age of HSTS in seconds, possible value: `31536000`|
 |GZIP_COMPRESSION_TYPE|enable gzip compression. The value of this envvar is a list of MIME types that will be compressed, possible value: `text/html text/plain text/css`|
+|OPTION|comma-separated list of HAProxy `option` entries. `option` specified here will be added to related backend or listen part, and overwrite the OPTION settings in the HAProxy container|
 
 Check [the HAProxy configuration manual](http://cbonte.github.io/haproxy-dconv/configuration-1.5.html) for more information on the above.
 

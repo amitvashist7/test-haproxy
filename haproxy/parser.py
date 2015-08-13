@@ -320,3 +320,9 @@ class EnvParser(object):
     @staticmethod
     def parse_gzip_compression_type(value):
         return value
+
+    @staticmethod
+    def parse_option(value):
+        if value:
+            return [p.strip() for p in value.strip().split(",") if p.strip()]
+        return []

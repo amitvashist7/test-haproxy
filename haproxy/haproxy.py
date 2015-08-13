@@ -228,6 +228,11 @@ class Haproxy(object):
                             listen.append(" ".join(tcp_route))
                             self.routes_added.append(route)
 
+            options = self._get_service_attr('option', service_alias)
+            if options:
+                for option in options:
+                    listen.append("option %s" % option)
+
             cfg["listen port_%s" % port_num] = listen
             cfgs.append(cfg)
 
@@ -376,6 +381,11 @@ class Haproxy(object):
             if gzip_compression_type:
                 backend.append("compression algo gzip")
                 backend.append("compression type %s" % gzip_compression_type)
+
+            options = self._get_service_attr('option', service_alias)
+            if options:
+                for option in options:
+                    backend.append("option %s" % option)
 
             for _service_alias, routes in self.specs.get_routes().iteritems():
                 if not service_alias or _service_alias == service_alias:
