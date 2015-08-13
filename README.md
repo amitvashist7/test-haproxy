@@ -61,6 +61,9 @@ Settings in this part is immutable, you have to redeploy HAProxy service to make
 |STATS_AUTH|stats:stats|username and password required to access the Haproxy stats.|
 |TIMEOUT|connect 5000, client 50000, server 50000|comma-separated list of HAProxy `timeout` entries to the `default` section.|
 |HEALTH_CHECK|check|set health check on each backend route, possible value: "check inter 2000 rise 2 fall 3". See:[HAProxy:check](https://cbonte.github.io/haproxy-dconv/configuration-1.5.html#5.2-check)|
+|EXTRA_GLOBAL_SETTINGS|<empty>|comma-separated string of extra settings, and each part will be appended to GLOBAL section in the configuration file. To escape comma, use `\,`. Possible value: `tune.ssl.cachesize 20000, tune.ssl.default-dh-param 2048`|
+|EXTRA_DEFAULT_SETTINGS|<empty>|comma-separated string of extra settings, and each part will be appended to DEFAULT section in the configuration file. To escape comma, use `\,`|
+
 
 ###Settings in linked application services###
 

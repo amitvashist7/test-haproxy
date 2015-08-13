@@ -69,5 +69,6 @@ def main():
     else:
         run_haproxy()
 
+
 if __name__ == "__main__":
     main()
