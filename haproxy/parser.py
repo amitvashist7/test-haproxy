@@ -326,3 +326,7 @@ class EnvParser(object):
         if value:
             return [p.strip() for p in value.strip().split(",") if p.strip()]
         return []
+
+    @staticmethod
+    def parse_extra_settings(value):
+        return value

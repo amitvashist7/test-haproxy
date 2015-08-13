@@ -195,13 +195,13 @@ class Haproxy(object):
             settings = re.split(r'(?<!\\),', Haproxy.envvar_extra_default_settings)
             for setting in settings:
                 if setting.strip():
-                    cfg["defaults"].append(setting.strip())
+                    cfg["defaults"].append(setting.strip().replace("\,", ","))
 
         if Haproxy.envvar_extra_global_settings:
             settings = re.split(r'(?<!\\),', Haproxy.envvar_extra_global_settings)
             for setting in settings:
                 if setting.strip():
-                    cfg["global"].append(setting.strip())
+                    cfg["global"].append(setting.strip().replace("\,", ","))
         return cfg
 
     def _config_tcp(self):
@@ -248,6 +248,13 @@ class Haproxy(object):
             if options:
                 for option in options:
                     listen.append("option %s" % option)
+
+            extra_settings = self._get_service_attr('extra_settings', service_alias)
+            if extra_settings:
+                settings = re.split(r'(?<!\\),', extra_settings)
+                for setting in settings:
+                    if setting.strip():
+                        listen.append(setting.strip().replace("\,", ","))
 
             cfg["listen port_%s" % port_num] = listen
             cfgs.append(cfg)
@@ -402,6 +409,13 @@ class Haproxy(object):
             if options:
                 for option in options:
                     backend.append("option %s" % option)
+
+            extra_settings = self._get_service_attr('extra_settings', service_alias)
+            if extra_settings:
+                settings = re.split(r'(?<!\\),', extra_settings)
+                for setting in settings:
+                    if setting.strip():
+                        backend.append(setting.strip().replace("\,", ","))
 
             for _service_alias, routes in self.specs.get_routes().iteritems():
                 if not service_alias or _service_alias == service_alias:
