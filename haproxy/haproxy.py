@@ -3,6 +3,7 @@ import logging
 import subprocess
 import time
 import copy
+import re
 from collections import OrderedDict
 
 import tutum
@@ -25,6 +26,8 @@ class Haproxy(object):
     envvar_stats_port = os.getenv("STATS_PORT", "1936")
     envvar_timeout = os.getenv("TIMEOUT", "connect 5000, client 50000, server 50000").split(",")
     envvar_health_check = os.getenv("HEALTH_CHECK", "check inter 2000 rise 2 fall 3")
+    envvar_extra_global_settings = os.getenv("EXTRA_GLOBAL_SETTINGS", )
+    envvar_extra_default_settings = os.getenv("EXTRA_DEFAULT_SETTINGS", )
 
     # envvar overwritable
     envvar_balance = os.getenv("BALANCE", "roundrobin")
@@ -63,7 +66,7 @@ class Haproxy(object):
     def update(self):
         cfg_dict = OrderedDict()
         self._config_ssl()
-        cfg_dict.update(self._config_default())
+        cfg_dict.update(self._config_global_defaults())
         for cfg in self._config_tcp():
             cfg_dict.update(cfg)
         cfg_dict.update(self._config_frontend())
@@ -151,41 +154,54 @@ class Haproxy(object):
             return False
 
     @classmethod
-    def _config_default(cls):
-        cfg = OrderedDict({
-            "global": ["log %s local0" % cls.envvar_rsyslog_destnation,
-                       "log %s local1 notice" % cls.envvar_rsyslog_destnation,
-                       "log-send-hostname",
-                       "maxconn %s" % cls.envvar_maxconn,
-                       "tune.ssl.default-dh-param 2048",
-                       "pidfile /var/run/haproxy.pid",
-                       "user haproxy",
-                       "group haproxy",
-                       "daemon",
-                       "stats socket /var/run/haproxy.stats level admin"],
-            "listen stats": ["bind :%s" % cls.envvar_stats_port,
-                             "mode http",
-                             "stats enable",
-                             "timeout connect 10s",
-                             "timeout client 1m",
-                             "timeout server 1m",
-                             "stats hide-version",
-                             "stats realm Haproxy\ Statistics",
-                             "stats uri /",
-                             "stats auth %s" % cls.envvar_stats_auth],
-            "defaults": ["balance %s" % cls.envvar_balance,
-                         "log global",
-                         "mode %s" % cls.envvar_mode]})
+    def _config_global_defaults(cls):
+        cfg = OrderedDict()
+        cfg["global"] = ["log %s local0" % cls.envvar_rsyslog_destnation,
+                         "log %s local1 notice" % cls.envvar_rsyslog_destnation,
+                         "log-send-hostname",
+                         "maxconn %s" % cls.envvar_maxconn,
+                         "pidfile /var/run/haproxy.pid",
+                         "user haproxy",
+                         "group haproxy",
+                         "daemon",
+                         "stats socket /var/run/haproxy.stats level admin"]
+        cfg["defaults"] = ["balance %s" % cls.envvar_balance,
+                           "log global",
+                           "mode %s" % cls.envvar_mode]
+        cfg["listen stats"] = ["bind :%s" % cls.envvar_stats_port,
+                               "mode http",
+                               "stats enable",
+                               "timeout connect 10s",
+                               "timeout client 1m",
+                               "timeout server 1m",
+                               "stats hide-version",
+                               "stats realm Haproxy\ Statistics",
+                               "stats uri /",
+                               "stats auth %s" % cls.envvar_stats_auth]
+
         for opt in cls.envvar_option:
             if opt:
                 cfg["defaults"].append("option %s" % opt.strip())
         for t in cls.envvar_timeout:
             if t:
                 cfg["defaults"].append("timeout %s" % t.strip())
+
         if cls.envvar_ssl_bind_options:
             cfg["global"].append("ssl-default-bind-options %s" % cls.envvar_ssl_bind_options)
         if cls.envvar_ssl_bind_ciphers:
             cfg["global"].append("ssl-default-bind-ciphers %s" % cls.envvar_ssl_bind_ciphers)
+
+        if Haproxy.envvar_extra_default_settings:
+            settings = re.split(r'(?<!\\),', Haproxy.envvar_extra_default_settings)
+            for setting in settings:
+                if setting.strip():
+                    cfg["defaults"].append(setting.strip().replace("\,", ","))
+
+        if Haproxy.envvar_extra_global_settings:
+            settings = re.split(r'(?<!\\),', Haproxy.envvar_extra_global_settings)
+            for setting in settings:
+                if setting.strip():
+                    cfg["global"].append(setting.strip().replace("\,", ","))
         return cfg
 
     def _config_tcp(self):
@@ -227,6 +243,18 @@ class Haproxy(object):
 
                             listen.append(" ".join(tcp_route))
                             self.routes_added.append(route)
+
+            options = self._get_service_attr('option', service_alias)
+            if options:
+                for option in options:
+                    listen.append("option %s" % option)
+
+            extra_settings = self._get_service_attr('extra_settings', service_alias)
+            if extra_settings:
+                settings = re.split(r'(?<!\\),', extra_settings)
+                for setting in settings:
+                    if setting.strip():
+                        listen.append(setting.strip().replace("\,", ","))
 
             cfg["listen port_%s" % port_num] = listen
             cfgs.append(cfg)
@@ -376,6 +404,18 @@ class Haproxy(object):
             if gzip_compression_type:
                 backend.append("compression algo gzip")
                 backend.append("compression type %s" % gzip_compression_type)
+
+            options = self._get_service_attr('option', service_alias)
+            if options:
+                for option in options:
+                    backend.append("option %s" % option)
+
+            extra_settings = self._get_service_attr('extra_settings', service_alias)
+            if extra_settings:
+                settings = re.split(r'(?<!\\),', extra_settings)
+                for setting in settings:
+                    if setting.strip():
+                        backend.append(setting.strip().replace("\,", ","))
 
             for _service_alias, routes in self.specs.get_routes().iteritems():
                 if not service_alias or _service_alias == service_alias:
