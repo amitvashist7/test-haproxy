@@ -26,8 +26,9 @@ class Haproxy(object):
     envvar_stats_port = os.getenv("STATS_PORT", "1936")
     envvar_timeout = os.getenv("TIMEOUT", "connect 5000, client 50000, server 50000").split(",")
     envvar_health_check = os.getenv("HEALTH_CHECK", "check inter 2000 rise 2 fall 3")
-    envvar_extra_global_settings = os.getenv("EXTRA_GLOBAL_SETTINGS", )
-    envvar_extra_default_settings = os.getenv("EXTRA_DEFAULT_SETTINGS", )
+    envvar_extra_global_settings = os.getenv("EXTRA_GLOBAL_SETTINGS")
+    envvar_extra_default_settings = os.getenv("EXTRA_DEFAULT_SETTINGS")
+    envvar_http_basic_auth = os.getenv("HTTP_BASIC_AUTH")
 
     # envvar overwritable
     envvar_balance = os.getenv("BALANCE", "roundrobin")
@@ -202,6 +203,20 @@ class Haproxy(object):
             for setting in settings:
                 if setting.strip():
                     cfg["global"].append(setting.strip().replace("\,", ","))
+
+        if Haproxy.envvar_http_basic_auth:
+            auth_list = re.split(r'(?<!\\),', Haproxy.envvar_http_basic_auth)
+            userlist = []
+            for auth in auth_list:
+                if auth.strip():
+                    terms = auth.strip().split(":", 1)
+                    if len(terms) == 2:
+                        username = terms[0].replace("\,", ",")
+                        password = terms[1].replace("\,", ",")
+                        userlist.append("user %s insecure-password %s" % (username,password))
+
+            if userlist:
+                cfg ["userlist haproxy_userlist"] = userlist
         return cfg
 
     def _config_tcp(self):
@@ -416,6 +431,10 @@ class Haproxy(object):
                 for setting in settings:
                     if setting.strip():
                         backend.append(setting.strip().replace("\,", ","))
+
+            if Haproxy.envvar_http_basic_auth:
+                backend.append("acl need_auth http_auth(haproxy_userlist)")
+                backend.append("http-request auth realm haproxy_basic_auth if !need_auth")
 
             for _service_alias, routes in self.specs.get_routes().iteritems():
                 if not service_alias or _service_alias == service_alias:
