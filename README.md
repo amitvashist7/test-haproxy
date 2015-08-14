@@ -10,9 +10,9 @@ Tag
 ---
 
     tutum/haproxy:latest    github branch master
+    tutum/haproxy:0.2       github branch master
     tutum/haproxy:0.1       github tag 0.1
 
-Note: tag `latest` is updated with new futures, like `virtual host`, `multiple ssl`, `multiple frontend`. tag `0.1` is the current stable version, with less features.
 Usage
 -----
 
