@@ -16,6 +16,7 @@ logger = logging.getLogger("haproxy")
 class Haproxy(object):
     # envvar
     envvar_default_ssl_cert = os.getenv("DEFAULT_SSL_CERT") or os.getenv("SSL_CERT")
+    envvar_default_ca_cert = os.getenv("CA_CERT")    
     envvar_maxconn = os.getenv("MAXCONN", "4096")
     envvar_mode = os.getenv("MODE", "http")
     envvar_option = os.getenv("OPTION", "redispatch, httplog, dontlognull, forwardfor").split(",")
@@ -35,6 +36,7 @@ class Haproxy(object):
 
     # const var
     const_cert_dir = "/certs/"
+    const_cacert_dir = "/cacerts/"
     const_config_file = "/haproxy.cfg"
     const_command = ['/usr/sbin/haproxy', '-f', const_config_file, '-db', '-q']
     const_api_retry = 10  # seconds
@@ -121,6 +123,9 @@ class Haproxy(object):
         certs = []
         if self.envvar_default_ssl_cert:
             certs.append(self.envvar_default_ssl_cert)
+		cacerts = []
+        if self.envvar_default_ca_cert:
+            cacerts.append(self.envvar_default_ca_cert)            
         certs.extend(self.specs.get_default_ssl_cert())
         certs.extend(self.specs.get_ssl_cert())
         if certs:
@@ -129,7 +134,13 @@ class Haproxy(object):
                 self.ssl_updated = True
                 self._save_certs(certs)
             self.ssl = "ssl crt /certs/"
-
+        if cacerts:
+            if set(cacerts) != set(Haproxy.cls_certs):
+                Haproxy.cls_certs = copy.copy(cacerts)
+                self.ssl_updated = True
+                self._save_ca_certs(cacerts)
+            self.ssl += " ca-file /cacerts/cert0.pem verify required"
+            
     def _save_certs(self, certs):
         try:
             if not os.path.exists(self.const_cert_dir):
@@ -144,6 +155,21 @@ class Haproxy(object):
             except Exception as e:
                 logger.error(e)
         logger.info("SSL certificates are updated")
+
+    def _save_ca_certs(self, certs):
+        try:
+            if not os.path.exists(self.const_cacert_dir):
+                os.makedirs(self.const_cacert_dir)
+        except Exception as e:
+            logger.error(e)
+        for index, cert in enumerate(certs):
+            cert_filename = "%scert%d.pem" % (self.const_cacert_dir, index)
+            try:
+                with open(cert_filename, 'w') as f:
+                    f.write(cert.replace("\\n", '\n'))
+            except Exception as e:
+                logger.error(e)
+        logger.info("CA certificates are updated")        
 
     def _save_conf(self):
         try:
