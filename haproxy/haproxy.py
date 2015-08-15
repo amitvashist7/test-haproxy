@@ -121,9 +121,9 @@ class Haproxy(object):
 
     def _config_ssl(self):
         certs = []
+        cacerts = []        
         if self.envvar_default_ssl_cert:
             certs.append(self.envvar_default_ssl_cert)
-		cacerts = []
         if self.envvar_default_ca_cert:
             cacerts.append(self.envvar_default_ca_cert)            
         certs.extend(self.specs.get_default_ssl_cert())
