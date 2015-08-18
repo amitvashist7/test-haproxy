@@ -64,6 +64,7 @@ Settings in this part is immutable, you have to redeploy HAProxy service to make
 |EXTRA_GLOBAL_SETTINGS|<empty>|comma-separated string of extra settings, and each part will be appended to GLOBAL section in the configuration file. To escape comma, use `\,`. Possible value: `tune.ssl.cachesize 20000, tune.ssl.default-dh-param 2048`|
 |EXTRA_DEFAULT_SETTINGS|<empty>|comma-separated string of extra settings, and each part will be appended to DEFAULT section in the configuration file. To escape comma, use `\,`|
 |HTTP_BASIC_AUTH|<empty>|a comma-separated list of credentials(`<user>:<pass>`) for HTTP basic auth, which applies to all the backend routes. To escape comma, use `\,`. *Attention:* DO NOT rely on this for authentication in production|
+|CA_CERT|<empty>|CA cert for haproxy to verify the client. Use the same format as `DEFAULT_SSL_CERT`|
 
 ###Settings in linked application services###
 
