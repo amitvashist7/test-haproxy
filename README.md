@@ -235,24 +235,27 @@ Use case scenarios
 
 Use the following:
 
+    docker run -d --expose 80 --name webapp tutum/hello-world
     docker run -d --link webapp:webapp -p 80:80 tutum/haproxy
 
-#### My webapp container exposes port 8080 and database ports 8083/8086, and I want the proxy to listen in port 80 without my database ports added to haproxy
+#### My webapp container exposes port 80 and database ports 8083/8086, and I want the proxy to listen in port 80 without my database ports added to haproxy
 
-	docker run -d --link webapp:webapp -e EXCLUDE_PORTS 8803,8806 -p 80:80 tutum/haproxy
+    docker run -d -e EXCLUDE_PORTS=8803,8806 --expose 80 --expose 8033 --expose 8086 --name webapp tutum/hello-world
+    docker run -d --link webapp:webapp -p 80:80 tutum/haproxy
 
 #### My webapp container exposes port 8080(or any other port), and I want the proxy to listen in port 8080
 
 Use the following:
 
+    docker run -d --expose 8080 --name webapp your_app
     docker run -d --link webapp:webapp -p 8080:80 tutum/haproxy
 
 #### I want the proxy to terminate SSL connections and forward plain HTTP requests to my webapp to port 8080(or any port)
 
 Use the following:
 
-	docker run -d -e SSL_CERT="YOUR_CERT_TEXT" --name webapp tutum/hello-world
-	docker run -d --link webapp:webapp -p 443:443 -p 80:80 tutum/haproxy
+    docker run -d -e SSL_CERT="YOUR_CERT_TEXT" --name webapp tutum/hello-world
+    docker run -d --link webapp:webapp -p 443:443 -p 80:80 tutum/haproxy
 
 or
 
@@ -266,8 +269,8 @@ The certificate in `YOUR_CERT_TEXT` is a combination of private key followed by 
 
 Use the following:
 
-	docker run -d -e FORCE_SSL=yes -e SSL_CERT="YOUR_CERT_TEXT" --name webapp tutum/hello-world
-	docker run -d --link webapp:webapp -p 443:443 tutum/haproxy
+    docker run -d -e FORCE_SSL=yes -e SSL_CERT="YOUR_CERT_TEXT" --name webapp tutum/hello-world
+    docker run -d --link webapp:webapp -p 443:443 tutum/haproxy
 
 #### I want to set up virtual host routing by domain
 
@@ -299,12 +302,12 @@ When you access `http://www.webapp1.com`, it will show the service running in co
     docker run -d -e VIRTUAL_HOST="*.example.com" -e VIRTUAL_HOST_WEIGHT=0 --name app tutum/hello-world
     docker run -d --link webapp:webapp --link app:app -p 80:80 tutum/haproxy
 
-##### I want all the requests to path `/path` point to my service
+#### I want all the requests to path `/path` point to my service
 
 	docker run -d -e VIRTUAL_HOST="*/path, */path/*" --name webapp tutum/hello-world
     docker run -d --link webapp:webapp -p 80:80 tutum/haproxy
 
-##### I want all the static html request point to my service
+#### I want all the static html request point to my service
 
 	docker run -d -e VIRTUAL_HOST="*/*.htm, */*.html" --name webapp tutum/hello-world
     docker run -d --link webapp:webapp -p 80:80 tutum/haproxy
