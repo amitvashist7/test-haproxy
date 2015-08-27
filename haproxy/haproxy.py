@@ -16,7 +16,7 @@ logger = logging.getLogger("haproxy")
 class Haproxy(object):
     # envvar
     envvar_default_ssl_cert = os.getenv("DEFAULT_SSL_CERT") or os.getenv("SSL_CERT")
-    envvar_default_ca_cert = os.getenv("CA_CERT")    
+    envvar_default_ca_cert = os.getenv("CA_CERT")
     envvar_maxconn = os.getenv("MAXCONN", "4096")
     envvar_mode = os.getenv("MODE", "http")
     envvar_option = os.getenv("OPTION", "redispatch, httplog, dontlognull, forwardfor").split(",")
@@ -121,11 +121,11 @@ class Haproxy(object):
 
     def _config_ssl(self):
         certs = []
-        cacerts = []        
+        cacerts = []
         if self.envvar_default_ssl_cert:
             certs.append(self.envvar_default_ssl_cert)
         if self.envvar_default_ca_cert:
-            cacerts.append(self.envvar_default_ca_cert)            
+            cacerts.append(self.envvar_default_ca_cert)
         certs.extend(self.specs.get_default_ssl_cert())
         certs.extend(self.specs.get_ssl_cert())
         if certs:
@@ -140,7 +140,7 @@ class Haproxy(object):
                 self.ssl_updated = True
                 self._save_ca_certs(cacerts)
             self.ssl += " ca-file /cacerts/cert0.pem verify required"
-            
+
     def _save_certs(self, certs):
         try:
             if not os.path.exists(self.const_cert_dir):
@@ -169,7 +169,7 @@ class Haproxy(object):
                     f.write(cert.replace("\\n", '\n'))
             except Exception as e:
                 logger.error(e)
-        logger.info("CA certificates are updated")        
+        logger.info("CA certificates are updated")
 
     def _save_conf(self):
         try:
@@ -239,10 +239,10 @@ class Haproxy(object):
                     if len(terms) == 2:
                         username = terms[0].replace("\,", ",")
                         password = terms[1].replace("\,", ",")
-                        userlist.append("user %s insecure-password %s" % (username,password))
+                        userlist.append("user %s insecure-password %s" % (username, password))
 
             if userlist:
-                cfg ["userlist haproxy_userlist"] = userlist
+                cfg["userlist haproxy_userlist"] = userlist
         return cfg
 
     def _config_tcp(self):
@@ -328,50 +328,50 @@ class Haproxy(object):
                     # add websocket acl rule
                     frontends_dict[port].append("acl is_websocket hdr(Upgrade) -i WebSocket")
 
+                acl_rule = []
                 # calculate virtual host rule
-                host_acl = ["acl", "host_rule_%d" % rule_counter]
+                host_rules = []
                 host = vhost["host"].strip("/")
                 if host == "*":
                     pass
                 elif "*" in host:
-                    host_acl.append("hdr_reg(host) -i %s" % host.replace(".", "\.").replace("*", ".*"))
-                elif host.startswith("*"):
-                    host_acl.append("hdr_end(host) -i %s" % host[1:])
-                elif host.endswith("*"):
-                    host_acl.append("hdr_beg(host) -i %s" % host[:-1])
+                    host_rules.append("acl host_rule_%d hdr_reg(host) -i %s" % (
+                        rule_counter, "^%s$" % host.replace(".", "\.").replace("*", ".*")))
                 elif host:
-                    host_acl.append("hdr_dom(host) -i %s" % host)
+                    host_rules.append("acl host_rule_%d hdr(host) -i %s" % (rule_counter, host))
+                    host_rules.append("acl host_rule_%d_port hdr(host) -i %s" % (rule_counter, "%s:%s" % (host, port)))
+                acl_rule.extend(host_rules)
 
                 # calculate virtual path rules
-                path_acl = ["acl", "path_rule_%d" % rule_counter]
+                path_rules = []
                 path = vhost["path"].strip()
-                if "*" in path[1:-1]:
-                    path_acl.append("path_reg -i %s" % path.replace(".", "\.").replace("*", ".*"))
-                elif path.startswith("*"):
-                    path_acl.append("path_end -i %s" % path[1:])
-                elif path.endswith("*"):
-                    path_acl.append("path_beg -i %s" % path[:-1])
+                if "*" in path:
+                    path_rules.append(
+                        "acl path_rule_%d path_reg -i ^%s$" % (
+                        rule_counter, path.replace(".", "\.").replace("*", ".*")))
                 elif path:
-                    path_acl.append("path -i %s" % path)
+                    path_rules.append("acl path_rule_%d path -i %s" % (rule_counter, path))
+                acl_rule.extend(path_rules)
 
-                if len(host_acl) > 2 or len(path_acl):
-                    service_alias = vhost["service_alias"]
-                    if len(host_acl) > 2 and len(path_acl) > 2:
-                        acl_condition = "host_rule_%d path_rule_%d" % (rule_counter, rule_counter)
-                        if vhost["scheme"].lower() in ["ws", "wss"]:
-                            acl_condition += " is_websocket"
+                if vhost["scheme"].lower() in ["ws", "wss"]:
+                    acl_condition = "is_websocket"
+                else:
+                    acl_condition = ""
 
-                        acl_rule = [" ".join(host_acl), " ".join(path_acl),
-                                    "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
-                    elif len(host_acl) > 2:
-                        acl_condition = "host_rule_%d" % rule_counter
-                        acl_rule = [" ".join(host_acl),
-                                    "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
-                    elif len(path_acl) > 2:
-                        acl_condition = "path_rule_%d" % rule_counter
-                        acl_rule = [" ".join(path_acl),
-                                    "use_backend SERVICE_%s if %s" % (service_alias, acl_condition)]
+                if path_rules:
+                    acl_condition = " ".join([acl_condition, "path_rule_%d" % rule_counter])
 
+                if host_rules:
+                    if '*' in host:
+                        acl_condition = ("%s host_rule_%d" % (acl_condition, rule_counter)).strip()
+                    else:
+                        acl_condition_1 = ("%s host_rule_%d" % (acl_condition, rule_counter)).strip()
+                        acl_condition_2 = ("%s host_rule_%d_port" % (acl_condition, rule_counter)).strip()
+                        acl_condition = " or ".join([acl_condition_1, acl_condition_2])
+
+                if acl_condition:
+                    use_backend = "use_backend SERVICE_%s if %s" % (vhost["service_alias"], acl_condition)
+                    acl_rule.append(use_backend)
                     frontends_dict[port].extend(acl_rule)
 
             for port, frontend in frontends_dict.iteritems():

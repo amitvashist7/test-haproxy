@@ -6,6 +6,4 @@ test:
     - pyenv global 2.7.6
   override:
     - docker build -t test-haproxy -f Dockerfile-test .
-    - docker run -d --privileged -ti test-haproxy
-  post:
-    - tutum service terminate $(tutum service ps -q) || true
+    - docker run -ti --rm --privileged -ti test-haproxy
