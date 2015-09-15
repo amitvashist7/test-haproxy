@@ -1,6 +1,8 @@
 import logging
 import os
 import sys
+import subprocess
+import threading
 
 import tutum
 
@@ -13,9 +15,11 @@ tutum.user_agent = "tutum-haproxy/%s" % __version__
 DEBUG = os.getenv("DEBUG", False)
 
 logger = logging.getLogger("haproxy")
+ARP_CACHE = ""
 
 
 def run_haproxy():
+    check_arp()
     haproxy = Haproxy()
     haproxy.update()
 
@@ -28,6 +32,7 @@ def tutum_event_handler(event):
                     len(set(Haproxy.cls_linked_services).intersection(set(event.get("parents", [])))) > 0:
         logger.info("Tutum event detected: %s %s is %s" %
                     (event["type"], parse_uuid_from_resource_uri(event.get("resource_uri", "")), event["state"]))
+
         run_haproxy()
 
     # Add/remove services linked to haproxy
@@ -44,7 +49,20 @@ def tutum_event_handler(event):
                 changes += " linked added: %s" % added
             logger.info(changes)
             Haproxy.cls_linked_services = service_endpoints
+
             run_haproxy()
+
+
+def check_arp():
+    global ARP_CACHE
+    try:
+        arp_cache = subprocess.check_output(["arp", "-n"])
+    except:
+        arp_cache = ""
+
+    if arp_cache != ARP_CACHE:
+        ARP_CACHE = arp_cache
+        logger.info("ARP entry is updated:\n%s" % arp_cache)
 
 
 def main():
@@ -60,6 +78,8 @@ def main():
                 "an API role to this service for automatic backend reconfiguration")
     else:
         logger.info("HAProxy is not running in Tutum")
+
+    threading.Timer(30, check_arp).start()
 
     if Haproxy.cls_container_uri and Haproxy.cls_service_uri and Haproxy.cls_tutum_auth:
         events = tutum.TutumEvents()

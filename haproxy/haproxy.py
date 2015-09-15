@@ -348,7 +348,7 @@ class Haproxy(object):
                 if "*" in path:
                     path_rules.append(
                         "acl path_rule_%d path_reg -i ^%s$" % (
-                        rule_counter, path.replace(".", "\.").replace("*", ".*")))
+                            rule_counter, path.replace(".", "\.").replace("*", ".*")))
                 elif path:
                     path_rules.append("acl path_rule_%d path -i %s" % (rule_counter, path))
                 acl_rule.extend(path_rules)
