@@ -1,4 +1,4 @@
-FROM jpetazzo/dind:latest
+FROM tutum/dind:latest
 
 RUN apt-get install -y --no-install-recommends make python-pip && \
     pip install tutum && \
