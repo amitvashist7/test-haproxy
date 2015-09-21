@@ -96,12 +96,12 @@ Virtual host and virtual path
 
 Both virtual host and virtual path can be specified in environment variable `VIRTUAL_HOST`, which is a set of comma separated urls with the format of `[scheme://]domain[:port][/path]`.
 
- |item|default|description|
- |:---:|:-----:|:---------|
- |scheme|http|possible values: `http`, `https`, `wss`|
- |domain||virtual host. `*` can be used as the wildcard|
- |port|80/433|port number of the virtual host. When the scheme is `https`  `wss`, the default port will be to `443`|
- |/path||virtual path, starts with `/`. `*` can be used as the wildcard|
+|item|default|description|
+|:---:|:-----:|:---------|
+|scheme|http|possible values: `http`, `https`, `wss`|
+|domain||virtual host. `*` can be used as the wildcard|
+|port|80/433|port number of the virtual host. When the scheme is `https`  `wss`, the default port will be to `443`|
+|/path||virtual path, starts with `/`. `*` can be used as the wildcard|
 
 ###examples of matching
 
