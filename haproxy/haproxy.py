@@ -335,11 +335,13 @@ class Haproxy(object):
                 if host == "*":
                     pass
                 elif "*" in host:
-                    host_rules.append("acl host_rule_%d hdr_reg(host) -i %s" % (
-                        rule_counter, "^%s$" % host.replace(".", "\.").replace("*", ".*")))
+                    host_rules.append("acl host_rule_%d hdr_reg(host) -i ^%s$" % (
+                        rule_counter, host.replace(".", "\.").replace("*", ".*")))
+                    host_rules.append("acl host_rule_%d_port hdr_reg(host) -i ^%s:%s$" % (
+                        rule_counter, host.replace(".", "\.").replace("*", ".*"), port))
                 elif host:
                     host_rules.append("acl host_rule_%d hdr(host) -i %s" % (rule_counter, host))
-                    host_rules.append("acl host_rule_%d_port hdr(host) -i %s" % (rule_counter, "%s:%s" % (host, port)))
+                    host_rules.append("acl host_rule_%d_port hdr(host) -i %s:%s" % (rule_counter, host, port))
                 acl_rule.extend(host_rules)
 
                 # calculate virtual path rules
@@ -362,12 +364,9 @@ class Haproxy(object):
                     acl_condition = " ".join([acl_condition, "path_rule_%d" % rule_counter])
 
                 if host_rules:
-                    if '*' in host:
-                        acl_condition = ("%s host_rule_%d" % (acl_condition, rule_counter)).strip()
-                    else:
-                        acl_condition_1 = ("%s host_rule_%d" % (acl_condition, rule_counter)).strip()
-                        acl_condition_2 = ("%s host_rule_%d_port" % (acl_condition, rule_counter)).strip()
-                        acl_condition = " or ".join([acl_condition_1, acl_condition_2])
+                    acl_condition_1 = ("%s host_rule_%d" % (acl_condition, rule_counter)).strip()
+                    acl_condition_2 = ("%s host_rule_%d_port" % (acl_condition, rule_counter)).strip()
+                    acl_condition = " or ".join([acl_condition_1, acl_condition_2])
 
                 if acl_condition:
                     use_backend = "use_backend SERVICE_%s if %s" % (vhost["service_alias"], acl_condition)

@@ -157,6 +157,15 @@ curl -sSfL --resolve web-b.org:8080:${DOCKER_HOST_IP} web-b.org:8080 2>&1 | grep
 curl -sSfL --resolve web-b.org:8080:${DOCKER_HOST_IP} -H 'Host:web-b.org' web-b.org:8080 2>&1 | grep -iF 'My hostname is web-b' > /dev/null
 echo
 
+echo "=> The virtual host with wildcard in host and on a non-default port"
+rm_container web-a lb
+docker run -d --name web-a -e HOSTNAME=web-a -e VIRTUAL_HOST="http://web-*.org:8080" tutum/hello-world
+docker run -d --name lb --link web-a:web-a -p 8080:8080 haproxy
+wait_for_startup http://${DOCKER_HOST_IP}:8080
+curl -sSfL --resolve web-a.org:8080:${DOCKER_HOST_IP} web-a.org:8080 2>&1 | grep -iF 'My hostname is web-a' > /dev/null
+curl -sSfL --resolve web-a.org:8080:${DOCKER_HOST_IP} -H 'Host:web-a.org' web-a.org:8080 2>&1 | grep -iF 'My hostname is web-a' > /dev/null
+echo
+
 echo "=> Test virtual host that starts with wildcard"
 rm_container web-a lb
 docker run -d --name web-a -e HOSTNAME=web-a -e VIRTUAL_HOST="*.web-a.org" tutum/hello-world
@@ -269,6 +278,19 @@ curl -sSfL --resolve www.web-a.org:80:${DOCKER_HOST_IP} www.web-a.org:80/p/ 2>&1
 curl -sSfL ${DOCKER_HOST_IP}/p3/ 2>&1 | grep -iF '503 Service Unavailable' > /dev/null
 curl -sSfL --resolve www.web.org:80:${DOCKER_HOST_IP} www.web.org 2>&1 | grep -iF '503 Service Unavailable' > /dev/null
 curl -sSfL --resolve www.web-a.org:80:${DOCKER_HOST_IP} www.web-a.org/p3 2>&1 | grep -iF '503 Service Unavailable' > /dev/null
+echo
+
+echo "=> Test virtual host combined with virtual path including wildcard on a none default port"
+rm_container web-a lb
+docker run -d --name web-a -e HOSTNAME=web-a -e VIRTUAL_HOST="http://www.web-*.org:8080/p*/" tutum/hello-world
+docker run -d --name lb --link web-a:web-a -p 8080:8080 haproxy
+wait_for_startup http://${DOCKER_HOST_IP}:8080
+curl -sSfL --resolve www.web-a.org:8080:${DOCKER_HOST_IP} www.web-a.org:8080/p1/ 2>&1 | grep -iF 'My hostname is web-a' > /dev/null
+curl -sSfL --resolve www.web-a.org:8080:${DOCKER_HOST_IP} www.web-a.org:8080/p/ 2>&1 | grep -iF 'My hostname is web-a' > /dev/null
+curl -sSfL --resolve www.web-a.org:8080:${DOCKER_HOST_IP} www.web-a.org:8080/p/ 2>&1 -H HOST:www.web-a.org| grep -iF 'My hostname is web-a' > /dev/null
+curl -sSfL ${DOCKER_HOST_IP}:8080/p3/ 2>&1 | grep -iF '503 Service Unavailable' > /dev/null
+curl -sSfL --resolve www.web.org:8080:${DOCKER_HOST_IP} www.web.org:8080 2>&1 | grep -iF '503 Service Unavailable' > /dev/null
+curl -sSfL --resolve www.web-a.org:8080:${DOCKER_HOST_IP} www.web-a.org:8080/p3 2>&1 | grep -iF '503 Service Unavailable' > /dev/null
 echo
 
 echo "=> Test multiple frontends"
