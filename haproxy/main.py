@@ -16,10 +16,11 @@ DEBUG = os.getenv("DEBUG", False)
 
 logger = logging.getLogger("haproxy")
 ARP_CACHE = ""
+FLUSH_ARP = True
 
 
 def run_haproxy():
-    check_arp()
+    flush_arp()
     haproxy = Haproxy()
     haproxy.update()
 
@@ -63,6 +64,20 @@ def check_arp():
     if arp_cache != ARP_CACHE:
         ARP_CACHE = arp_cache
         logger.info("ARP entry is updated:\n%s" % arp_cache)
+
+
+def flush_arp():
+    global FLUSH_ARP
+    if FLUSH_ARP:
+        try:
+            output = subprocess.check_output(["ip", "-s", "-s", "neigh", "flush", "all"])
+        except:
+            output = ""
+
+        if output:
+            logger.info("Flushing ARP table:\n%s" % output)
+        else:
+            FLUSH_ARP = False
 
 
 def main():
