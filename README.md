@@ -33,7 +33,7 @@ Service vs container
 *container: the building block of docker.
 *service: the building block of tutum and tutum/haproxy
 
-What is a service? Service is a set of containers that have the same functionality. Usually, containers are created with the same parameters can be considered as a service. Service is a perfect concept for the load balancing management. When you scale up/down a service(changing the number of containers in the service), haproxy will balance the load accordingly.
+What is a service? Service is a set of containers that have the same functionality. Usually, containers are created with the same parameters can be considered as a service. Service is a perfect concept for the load balancing management. When you scale up/down a service (changing the number of containers in the service), haproxy will balance the load accordingly.
 
 To set containers in one service, you can:
 
@@ -111,7 +111,7 @@ Both virtual host and virtual path can be specified in environment variable `VIR
 |example.com|example.com|www.example.com|
 |example.com:90|example.com:90|example.com|
 |https://example.com|https://example.com|example.com|
-|https://example.com:444|https://example.com|https://example.com|
+|https://example.com:444|https://example.com:444|https://example.com|
 |\*.example.com|www.example.com|example.com|
 |\*example.com|www.example.com, example.com, anotherexample.com|www.abc.com|
 |www.e\*e.com|www.example.com, www.exxe.com|www.axxa.com|
@@ -165,7 +165,7 @@ Copy the output and set it as the value of `SSL_CERT` or `DEFAULT_SSL_CERT`.
 Affinity and session stickiness
 -----------------------------------
 
-There are tree method to setup affinity and sticky session:
+There are three method to setup affinity and sticky session:
 
 1. set `BALANCE=source` in your application service. When setting `source` method of balance, HAProxy will hash the client IP address and make sure that the same IP always goes to the same server.
 2. set `APPSESSION=<value>`. use application session to determine which server a client should connect to. Possible value of `<value>` could be `JSESSIONID len 52 timeout 3h`
