@@ -20,6 +20,32 @@ class Specs(object):
         self.details = self._parse_details()
         self.routes = self._parse_routes(tutum_haproxy_container)
         self.vhosts = self._parse_vhosts()
+        self.merge_services_with_same_vhost()
+
+    def merge_services_with_same_vhost(self):
+        same_vhost_service = {}
+        unique_vhost = {}
+
+        for service_alias, detail in self.details.iteritems():
+            vhost = detail['virtual_host']
+            if vhost:
+                vhost_str = str(vhost)
+                if vhost_str in unique_vhost:
+                    same_vhost_service[service_alias] = unique_vhost[vhost_str]
+                else:
+                    unique_vhost[vhost_str] = service_alias
+
+        for service_alias in same_vhost_service:
+            self.service_aliases.remove(service_alias)
+            del self.details[service_alias]
+
+            for route in self.routes[service_alias]:
+                self.routes[same_vhost_service[service_alias]].append(route)
+            del self.routes[service_alias]
+
+            for vhost in self.vhosts:
+                if vhost['service_alias'] == service_alias:
+                    self.vhosts.remove(vhost)
 
     def _parse_envvars(self, tutum_haproxy_container):
         envvars = {}
@@ -70,7 +96,8 @@ class Specs(object):
             virtual_hosts = attr["virtual_host"]
 
             if virtual_hosts:
-                for vhost in virtual_hosts:
+                for v in virtual_hosts:
+                    vhost = dict(v)
                     vhost["service_alias"] = service_alias
                     vhosts.append(vhost)
         try:
@@ -107,6 +134,9 @@ class Specs(object):
                     self.force_ssl.append(service_alias)
         return self.force_ssl
 
+    def get_service_aliases(self):
+        return self.service_aliases
+
 
 class RouteParser(object):
     backend_match = re.compile(r"(?P<proto>tcp|udp):\/\/(?P<addr>[^:]*):(?P<port>.*)")
@@ -122,7 +152,7 @@ class RouteParser(object):
 
     @staticmethod
     def parse_tutum_routes(details, container_links):
-        # Input:  settings        = {'HELLO_1': {'exclude_ports': ['3306']}}
+        # Input:  details         = {'HELLO_1': {'exclude_ports': ['3306']}}
         #         container_links = [{"endpoints": {"80/tcp": "tcp://10.7.0.3:80", "3306/tcp": "tcp://10.7.0.8:3306"},
         #                             "name": "hello-1",
         #                             "from_container": "/api/v1/container/702d18d4-7934-4715-aea3-c0637f1a4129/",
@@ -152,12 +182,12 @@ class RouteParser(object):
 
     @staticmethod
     def parse_local_routes(details, envvars):
-        # Input:  settings = {'HELLO_1': {'exclude_ports': [3306]}}
-        #         envvars  = {'HELLO_1_PORT_80_TCP': 'tcp://172.17.0.30:80',
+        # Input:  details = {'HELLO_1': {'exclude_ports': [3306]}}
+        #         envvars = {'HELLO_1_PORT_80_TCP': 'tcp://172.17.0.30:80',
         #                    'HELLO_2_PORT_80_TCP': 'tcp://172.17.0.31:80',
         #                    'HELLO_1_PORT_3306_TCP': 'tcp://172.17.0.30:3306',
         #                    'HELLO_2_PORT_3306_TCP': 'tcp://172.17.0.31:3306'}
-        # Output: routes   = {'HELLO_2': [{'proto': 'tcp', 'port': '3306', 'addr': '172.17.0.31'},
+        # Output: routes  = {'HELLO_2': [{'proto': 'tcp', 'port': '3306', 'addr': '172.17.0.31'},
         #                                {'proto': 'tcp', 'port': '80', 'addr': '172.17.0.31'}],
         #                    'HELLO_1': [{'proto': 'tcp', 'port': '80', 'addr': '172.17.0.30'}]}
         routes = {}
@@ -273,6 +303,8 @@ class EnvParser(object):
                            "host": host,
                            "port": port,
                            "path": pr.path})
+
+        vhosts.sort()
         return vhosts
 
     @staticmethod

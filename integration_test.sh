@@ -323,7 +323,7 @@ curl -sSfL --cacert ca1.pem --resolve web-a.org:443:127.0.0.1 https://web-a.org 
 curl -sSfL --cacert ca2.pem --resolve web-b.org:443:127.0.0.1 https://web-b.org 2>&1 | grep -iF 'My hostname is web-b' > /dev/null
 curl -sSfL --cacert ca1.pem --resolve web-a.org:443:127.0.0.1 --resolve web-a.org:80:127.0.0.1 http://web-a.org 2>&1 | grep -iF 'My hostname is web-a' > /dev/null
 curl -sSfL --cacert ca2.pem --resolve web-b.org:443:127.0.0.1 --resolve web-b.org:80:127.0.0.1 http://web-b.org 2>&1 | grep -iF 'My hostname is web-b' > /dev/null
-curl -sSIL --cacert ca1.pem --resolve web-a.org:443:127.0.0.1 --resolve web-a.org:80:127.0.0.1 http://web-a.org 2>&1 | grep -iF "http/1.1" | grep -v "301"
+curl -sSIL --cacert ca1.pem --resolve web-a.org:443:127.0.0.1 --resolve web-a.org:80:127.0.0.1 http://web-a.org 2>&1 | grep -iF "http/1.1" | grep -v "301" > /dev/null
 curl -sSIL --cacert ca2.pem --resolve web-b.org:443:127.0.0.1 --resolve web-b.org:80:127.0.0.1 http://web-b.org 2>&1 | grep -iF '301 Moved Permanently' > /dev/null
 echo
 

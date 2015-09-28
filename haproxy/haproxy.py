@@ -251,7 +251,7 @@ class Haproxy(object):
             return cfgs
 
         ports = []
-        for service_alias in self.specs.service_aliases:
+        for service_alias in self.specs.get_service_aliases():
             tcp_ports = self._get_service_attr("tcp_ports", service_alias)
             if tcp_ports:
                 ports.extend(tcp_ports)
@@ -399,7 +399,7 @@ class Haproxy(object):
         if not self.specs.get_vhosts():
             services_aliases = [None]
         else:
-            services_aliases = self.specs.service_aliases
+            services_aliases = self.specs.get_service_aliases()
 
         for service_alias in services_aliases:
             backend = []
