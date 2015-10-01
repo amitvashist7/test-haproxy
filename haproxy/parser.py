@@ -20,6 +20,33 @@ class Specs(object):
         self.details = self._parse_details()
         self.routes = self._parse_routes(tutum_haproxy_container)
         self.vhosts = self._parse_vhosts()
+        self.merge_services_with_same_vhost()
+
+    def merge_services_with_same_vhost(self):
+        services_with_same_vhost = {}
+        unique_vhost = {}
+
+        for service_alias, detail in self.details.iteritems():
+            vhost_str = detail['virtual_host_str']
+            if vhost_str:
+                if vhost_str in unique_vhost:
+                    services_with_same_vhost[service_alias] = unique_vhost[vhost_str]
+                else:
+                    unique_vhost[vhost_str] = service_alias
+
+        for service_alias in services_with_same_vhost:
+            self.service_aliases.remove(service_alias)
+            del self.details[service_alias]
+
+            for route in self.routes[service_alias]:
+                self.routes[services_with_same_vhost[service_alias]].append(route)
+            del self.routes[service_alias]
+
+            vhosts = []
+            for vhost in self.vhosts:
+                if vhost['service_alias'] != service_alias:
+                    vhosts.append(vhost)
+            self.vhosts = vhosts
 
     def _parse_envvars(self, tutum_haproxy_container):
         envvars = {}
@@ -65,19 +92,47 @@ class Specs(object):
         return RouteParser.parse(self.details, tutum_haproxy_container)
 
     def _parse_vhosts(self):
+        # copy virtual_host to vritual_host_str, and then parse virtual_host
+        # 'http://a.com:8080, https://b.com, c.com'  = >
+        #   [{'path': '', 'host': 'a.com', 'scheme': 'http', 'port': '8080'},
+        #    {'path': '', 'host': 'b.com', 'scheme': 'https', 'port': '443'},
+        #    {'path': '', 'host': 'c.com', 'scheme': 'http', 'port': '80'}]
+        parsed_virtual_host = []
+        for service_alias, attr in self.details.iteritems():
+            virtual_host_str = attr["virtual_host_str"] = attr["virtual_host"]
+
+            parsed_virtual_host = []
+            if virtual_host_str:
+                for h in [h.strip() for h in virtual_host_str.strip().split(",")]:
+                    pr = urlparse.urlparse(h)
+                    if not pr.netloc:
+                        pr = urlparse.urlparse("http://%s" % h)
+                    port = '443' if pr.scheme.lower() in ['https', 'wss'] else "80"
+                    host = pr.netloc
+                    if ":" in pr.netloc:
+                        host_port = pr.netloc.split(":")
+                        host = host_port[0]
+                        port = host_port[1]
+                    parsed_virtual_host.append({"scheme": pr.scheme,
+                                                "host": host,
+                                                "port": port,
+                                                "path": pr.path})
+            self.details[service_alias]["virtual_host"] = parsed_virtual_host
+
         vhosts = []
         for service_alias, attr in self.details.iteritems():
             virtual_hosts = attr["virtual_host"]
 
             if virtual_hosts:
-                for vhost in virtual_hosts:
+                for v in virtual_hosts:
+                    vhost = dict(v)
                     vhost["service_alias"] = service_alias
                     vhosts.append(vhost)
         try:
             return sorted(vhosts, key=lambda vhost: self.details[vhost["service_alias"]]["virtual_host_weight"],
                           reverse=True)
         except:
-            vhosts
+            return vhosts
 
     def get_details(self):
         return self.details
@@ -107,6 +162,9 @@ class Specs(object):
                     self.force_ssl.append(service_alias)
         return self.force_ssl
 
+    def get_service_aliases(self):
+        return self.service_aliases
+
 
 class RouteParser(object):
     backend_match = re.compile(r"(?P<proto>tcp|udp):\/\/(?P<addr>[^:]*):(?P<port>.*)")
@@ -122,7 +180,7 @@ class RouteParser(object):
 
     @staticmethod
     def parse_tutum_routes(details, container_links):
-        # Input:  settings        = {'HELLO_1': {'exclude_ports': ['3306']}}
+        # Input:  details         = {'HELLO_1': {'exclude_ports': ['3306']}}
         #         container_links = [{"endpoints": {"80/tcp": "tcp://10.7.0.3:80", "3306/tcp": "tcp://10.7.0.8:3306"},
         #                             "name": "hello-1",
         #                             "from_container": "/api/v1/container/702d18d4-7934-4715-aea3-c0637f1a4129/",
@@ -152,12 +210,12 @@ class RouteParser(object):
 
     @staticmethod
     def parse_local_routes(details, envvars):
-        # Input:  settings = {'HELLO_1': {'exclude_ports': [3306]}}
-        #         envvars  = {'HELLO_1_PORT_80_TCP': 'tcp://172.17.0.30:80',
+        # Input:  details = {'HELLO_1': {'exclude_ports': [3306]}}
+        #         envvars = {'HELLO_1_PORT_80_TCP': 'tcp://172.17.0.30:80',
         #                    'HELLO_2_PORT_80_TCP': 'tcp://172.17.0.31:80',
         #                    'HELLO_1_PORT_3306_TCP': 'tcp://172.17.0.30:3306',
         #                    'HELLO_2_PORT_3306_TCP': 'tcp://172.17.0.31:3306'}
-        # Output: routes   = {'HELLO_2': [{'proto': 'tcp', 'port': '3306', 'addr': '172.17.0.31'},
+        # Output: routes  = {'HELLO_2': [{'proto': 'tcp', 'port': '3306', 'addr': '172.17.0.31'},
         #                                {'proto': 'tcp', 'port': '80', 'addr': '172.17.0.31'}],
         #                    'HELLO_1': [{'proto': 'tcp', 'port': '80', 'addr': '172.17.0.30'}]}
         routes = {}
@@ -251,29 +309,7 @@ class EnvParser(object):
 
     @staticmethod
     def parse_virtual_host(value):
-        # 'http://a.com:8080, https://b.com, c.com'  = >
-        #   [{'path': '', 'host': 'a.com', 'scheme': 'http', 'port': '8080'},
-        #    {'path': '', 'host': 'b.com', 'scheme': 'https', 'port': '443'},
-        #    {'path': '', 'host': 'c.com', 'scheme': 'http', 'port': '80'}]
-        if not value:
-            return []
-
-        vhosts = []
-        for h in [h.strip() for h in value.strip().split(",")]:
-            pr = urlparse.urlparse(h)
-            if not pr.netloc:
-                pr = urlparse.urlparse("http://%s" % h)
-            port = '443' if pr.scheme.lower() in ['https', 'wss'] else "80"
-            host = pr.netloc
-            if ":" in pr.netloc:
-                host_port = pr.netloc.split(":")
-                host = host_port[0]
-                port = host_port[1]
-            vhosts.append({"scheme": pr.scheme,
-                           "host": host,
-                           "port": port,
-                           "path": pr.path})
-        return vhosts
+        return value
 
     @staticmethod
     def parse_force_ssl(value):

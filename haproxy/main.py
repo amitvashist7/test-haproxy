@@ -68,7 +68,7 @@ def check_arp():
 
 def flush_arp():
     global FLUSH_ARP
-    if FLUSH_ARP:
+    if FLUSH_ARP and Haproxy.cls_container_uri and Haproxy.cls_service_uri and Haproxy.cls_tutum_auth:
         try:
             output = subprocess.check_output(["ip", "-s", "-s", "neigh", "flush", "all"])
         except:
@@ -87,14 +87,13 @@ def main():
     if Haproxy.cls_container_uri and Haproxy.cls_service_uri:
         if Haproxy.cls_tutum_auth:
             logger.info("HAProxy has access to Tutum API - will reload list of backends in real-time")
+            threading.Timer(30, check_arp).start()
         else:
             logger.warning(
                 "HAProxy doesn't have access to Tutum API and it's running in Tutum - you might want to give "
                 "an API role to this service for automatic backend reconfiguration")
     else:
         logger.info("HAProxy is not running in Tutum")
-
-    threading.Timer(30, check_arp).start()
 
     if Haproxy.cls_container_uri and Haproxy.cls_service_uri and Haproxy.cls_tutum_auth:
         events = tutum.TutumEvents()
