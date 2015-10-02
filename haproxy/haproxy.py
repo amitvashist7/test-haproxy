@@ -29,6 +29,7 @@ class Haproxy(object):
     envvar_health_check = os.getenv("HEALTH_CHECK", "check inter 2000 rise 2 fall 3")
     envvar_extra_global_settings = os.getenv("EXTRA_GLOBAL_SETTINGS")
     envvar_extra_default_settings = os.getenv("EXTRA_DEFAULT_SETTINGS")
+    envvar_extra_bind_settings = os.getenv("EXTRA_BIND_SETTINGS")
     envvar_http_basic_auth = os.getenv("HTTP_BASIC_AUTH")
 
     # envvar overwritable
@@ -51,6 +52,7 @@ class Haproxy(object):
     cls_certs = []
 
     def __init__(self):
+        Haproxy.extra_bind_settings = Haproxy._parse_extra_bind_settings(Haproxy.envvar_extra_bind_settings)
         self.ssl = None
         self.ssl_updated = False
         self.routes_added = []
@@ -195,7 +197,9 @@ class Haproxy(object):
         cfg["defaults"] = ["balance %s" % cls.envvar_balance,
                            "log global",
                            "mode %s" % cls.envvar_mode]
-        cfg["listen stats"] = ["bind :%s" % cls.envvar_stats_port,
+
+        bind = " ".join([cls.envvar_stats_port, cls.extra_bind_settings.get(cls.envvar_stats_port, "")])
+        cfg["listen stats"] = ["bind :%s" % bind.strip(),
                                "mode http",
                                "stats enable",
                                "timeout connect 10s",
@@ -266,10 +270,11 @@ class Haproxy(object):
                 if self.ssl:
                     ssl = True
 
+            bind = " ".join([self.port_num, self.extra_bind_settings.get(port_num, "")])
             if ssl:
-                listen = ["bind :%s %s" % (port_num, self.ssl), "mode tcp"]
-            else:
-                listen = ["bind :%s" % port, "mode tcp"]
+                bind = " ".join([bind.strip(), self.ssl])
+
+            listen = ["bind :%s" % bind.strip(), "mode tcp"]
 
             for _service_alias, routes in self.specs.get_routes().iteritems():
                 tcp_ports = self._get_service_attr("tcp_ports", _service_alias)
@@ -320,10 +325,14 @@ class Haproxy(object):
                             if scheme in ["https", "wss"] and self.ssl:
                                 ssl = True
                                 break
+
+                    bind = " ".join([port, self.extra_bind_settings.get(port, "")])
                     if ssl:
-                        frontends_dict[port] = ["bind :%s %s" % (port, self.ssl), "reqadd X-Forwarded-Proto:\ https"]
-                    else:
-                        frontends_dict[port] = ["bind :%s" % port]
+                        bind = " ".join([bind.strip(), self.ssl])
+
+                    frontends_dict[port] = ["bind :%s" % bind]
+                    if ssl:
+                        frontends_dict[port].append("reqadd X-Forwarded-Proto:\ https")
 
                     # add websocket acl rule
                     frontends_dict[port].append("acl is_websocket hdr(Upgrade) -i WebSocket")
@@ -384,9 +393,10 @@ class Haproxy(object):
                 self.require_default_route = True
 
             if self.require_default_route:
-                frontend = ["bind :80"]
+                frontend = [("bind :80 %s" % self.extra_bind_settings.get('80', "")).strip()]
                 if self.ssl and self:
-                    frontend.append("bind :443 %s" % self.ssl)
+                    frontend.append(
+                        ("bind :443 %s %s" % (self.ssl, self.extra_bind_settings.get('443', ""))).strip())
                     frontend.append("reqadd X-Forwarded-Proto:\ https")
                 frontend.append("default_backend default_service")
                 cfg["frontend default_frontend"] = frontend
@@ -516,3 +526,14 @@ class Haproxy(object):
                 logger.error(e)
                 time.sleep(cls.const_api_retry)
         return obj
+
+    @staticmethod
+    def _parse_extra_bind_settings(extra_bind_settings):
+        bind_dict = {}
+        if extra_bind_settings:
+            settings = re.split(r'(?<!\\),', extra_bind_settings)
+            for setting in settings:
+                term = setting.split(":", 1)
+                if len(term) == 2:
+                    bind_dict[term[0].strip()] = term[1].strip()
+        return bind_dict
