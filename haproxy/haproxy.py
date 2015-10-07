@@ -270,7 +270,7 @@ class Haproxy(object):
                 if self.ssl:
                     ssl = True
 
-            bind = " ".join([self.port_num, self.extra_bind_settings.get(port_num, "")])
+            bind = " ".join([port_num, self.extra_bind_settings.get(port_num, "")])
             if ssl:
                 bind = " ".join([bind.strip(), self.ssl])
 
