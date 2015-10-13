@@ -1,11 +1,8 @@
 import logging
 import os
 import sys
-import subprocess
-import threading
 
 import tutum
-
 from haproxy import Haproxy
 from parser import parse_uuid_from_resource_uri
 
@@ -15,12 +12,9 @@ tutum.user_agent = "tutum-haproxy/%s" % __version__
 DEBUG = os.getenv("DEBUG", False)
 
 logger = logging.getLogger("haproxy")
-ARP_CACHE = ""
-FLUSH_ARP = True
 
 
 def run_haproxy():
-    flush_arp()
     haproxy = Haproxy()
     haproxy.update()
 
@@ -54,32 +48,6 @@ def tutum_event_handler(event):
             run_haproxy()
 
 
-def check_arp():
-    global ARP_CACHE
-    try:
-        arp_cache = subprocess.check_output(["arp", "-n"])
-    except:
-        arp_cache = ""
-
-    if arp_cache != ARP_CACHE:
-        ARP_CACHE = arp_cache
-        logger.info("ARP entry is updated:\n%s" % arp_cache)
-
-
-def flush_arp():
-    global FLUSH_ARP
-    if FLUSH_ARP and Haproxy.cls_container_uri and Haproxy.cls_service_uri and Haproxy.cls_tutum_auth:
-        try:
-            output = subprocess.check_output(["ip", "-s", "-s", "neigh", "flush", "all"])
-        except:
-            output = ""
-
-        if output:
-            logger.info("Flushing ARP table:\n%s" % output)
-        else:
-            FLUSH_ARP = False
-
-
 def main():
     logging.basicConfig(stream=sys.stdout)
     logging.getLogger("haproxy").setLevel(logging.DEBUG if DEBUG else logging.INFO)
@@ -87,7 +55,6 @@ def main():
     if Haproxy.cls_container_uri and Haproxy.cls_service_uri:
         if Haproxy.cls_tutum_auth:
             logger.info("HAProxy has access to Tutum API - will reload list of backends in real-time")
-            threading.Timer(30, check_arp).start()
         else:
             logger.warning(
                 "HAProxy doesn't have access to Tutum API and it's running in Tutum - you might want to give "

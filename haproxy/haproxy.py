@@ -7,7 +7,6 @@ import re
 from collections import OrderedDict
 
 import tutum
-
 from parser import Specs
 
 logger = logging.getLogger("haproxy")
