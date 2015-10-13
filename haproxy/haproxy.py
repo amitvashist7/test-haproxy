@@ -90,12 +90,14 @@ class Haproxy(object):
                 self._run()
             else:
                 logger.info("HAProxy configuration remains unchanged")
+            logger.info("===========END===========")
         else:
             logger.info("HAProxy configuration:\n%s" % cfg)
             Haproxy.cls_cfg = cfg
             self._save_conf()
             logger.info("Launching HAProxy")
             p = subprocess.Popen(self.const_command)
+            logger.info("===========END===========")
             p.wait()
 
     def _run(self):
@@ -105,10 +107,10 @@ class Haproxy(object):
             process = subprocess.Popen(self.const_command + ["-sf", str(Haproxy.cls_haproxy_process.pid)])
             Haproxy.cls_haproxy_process.wait()
             Haproxy.cls_haproxy_process = process
-            logger.info("HAProxy has been reloaded\n******************************")
+            logger.info("HAProxy has been reloaded")
         else:
             # Launch haproxy
-            logger.info("Launching HAProxy\n******************************")
+            logger.info("Launching HAProxy")
             Haproxy.cls_haproxy_process = subprocess.Popen(self.const_command)
 
     @staticmethod

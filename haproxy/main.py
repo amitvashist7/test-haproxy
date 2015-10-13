@@ -14,9 +14,13 @@ DEBUG = os.getenv("DEBUG", False)
 logger = logging.getLogger("haproxy")
 
 
-def run_haproxy():
+def run_haproxy(msg=None):
+    logger.info("==========BEGIN==========")
+    if msg:
+        logger.info(msg)
     haproxy = Haproxy()
     haproxy.update()
+
 
 
 def tutum_event_handler(event):
@@ -25,27 +29,27 @@ def tutum_event_handler(event):
     if event.get("state", "") not in ["In progress", "Pending", "Terminating", "Starting", "Scaling", "Stopping"] and \
                     event.get("type", "").lower() in ["container", "service"] and \
                     len(set(Haproxy.cls_linked_services).intersection(set(event.get("parents", [])))) > 0:
-        logger.info("Tutum event detected: %s %s is %s" %
-                    (event["type"], parse_uuid_from_resource_uri(event.get("resource_uri", "")), event["state"]))
-
-        run_haproxy()
+        msg = "Tutum event: %s %s is %s" % (
+            event["type"], parse_uuid_from_resource_uri(event.get("resource_uri", "")), event["state"].lower())
+        run_haproxy(msg)
 
     # Add/remove services linked to haproxy
     if event.get("state", "") == "Success" and Haproxy.cls_service_uri in event.get("parents", []):
         service = Haproxy.fetch_tutum_obj(Haproxy.cls_service_uri)
         service_endpoints = [srv.get("to_service") for srv in service.linked_to_service]
         if Haproxy.cls_linked_services != service_endpoints:
-            removed = ", ".join(set(Haproxy.cls_linked_services) - set(service_endpoints))
-            added = ", ".join(set(service_endpoints) - set(Haproxy.cls_linked_services))
-            changes = "Tutum event detected:"
-            if removed:
-                changes += " linked removed: %s" % removed
-            if added:
-                changes += " linked added: %s" % added
-            logger.info(changes)
-            Haproxy.cls_linked_services = service_endpoints
+            services_unlinked = ",".join([parse_uuid_from_resource_uri(uri) for uri in
+                                          set(Haproxy.cls_linked_services) - set(service_endpoints)])
+            services_linked = ",".join([parse_uuid_from_resource_uri(uri) for uri in
+                                        set(service_endpoints) - set(Haproxy.cls_linked_services)])
+            msg = "Tutum event:"
+            if services_unlinked:
+                msg += " service %s is unlinked from HAProxy" % services_unlinked
+            if services_linked:
+                msg += " service %s is linked to HAProxy" % services_linked
 
-            run_haproxy()
+            Haproxy.cls_linked_services = service_endpoints
+            run_haproxy(msg)
 
 
 def main():
@@ -64,11 +68,12 @@ def main():
 
     if Haproxy.cls_container_uri and Haproxy.cls_service_uri and Haproxy.cls_tutum_auth:
         events = tutum.TutumEvents()
-        events.on_open(run_haproxy)
+        events.on_open(lambda: run_haproxy("Websocket open"))
+        events.on_close(lambda: logger.info("Websocket close"))
         events.on_message(tutum_event_handler)
         events.run_forever()
     else:
-        run_haproxy()
+        run_haproxy("Initial start")
 
 
 if __name__ == "__main__":
