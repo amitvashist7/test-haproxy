@@ -3,6 +3,7 @@ import os
 import sys
 
 import tutum
+
 from haproxy import Haproxy
 from parser import parse_uuid_from_resource_uri
 
@@ -22,7 +23,6 @@ def run_haproxy(msg=None):
     haproxy.update()
 
 
-
 def tutum_event_handler(event):
     logger.debug(event)
     # When service scale up/down or container start/stop/terminate/redeploy, reload the service
@@ -38,17 +38,16 @@ def tutum_event_handler(event):
         service = Haproxy.fetch_tutum_obj(Haproxy.cls_service_uri)
         service_endpoints = [srv.get("to_service") for srv in service.linked_to_service]
         if Haproxy.cls_linked_services != service_endpoints:
-            services_unlinked = ",".join([parse_uuid_from_resource_uri(uri) for uri in
-                                          set(Haproxy.cls_linked_services) - set(service_endpoints)])
-            services_linked = ",".join([parse_uuid_from_resource_uri(uri) for uri in
-                                        set(service_endpoints) - set(Haproxy.cls_linked_services)])
+            services_unlinked = ", ".join([parse_uuid_from_resource_uri(uri) for uri in
+                                           set(Haproxy.cls_linked_services) - set(service_endpoints)])
+            services_linked = ", ".join([parse_uuid_from_resource_uri(uri) for uri in
+                                         set(service_endpoints) - set(Haproxy.cls_linked_services)])
             msg = "Tutum event:"
             if services_unlinked:
                 msg += " service %s is unlinked from HAProxy" % services_unlinked
             if services_linked:
                 msg += " service %s is linked to HAProxy" % services_linked
 
-            Haproxy.cls_linked_services = service_endpoints
             run_haproxy(msg)
 
 
