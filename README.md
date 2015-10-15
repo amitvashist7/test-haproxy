@@ -348,3 +348,13 @@ Outside Tutum (any Docker server):
                                   |---- container_b1 (virtual host b) ---|
                                   |---- container_b2 (virtual host b) ---|---logic service_b
                                   |---- container_b3 (virtual host b) ---|
+
+Manually reload haproxy
+-----------------------
+
+In most cases, `tutum/haproxy` will configure itself automatically when the linked services change, you don't need to reload it manually. But for some reason, if you have to do so, here is how:
+
+* `docker exec <haproxy_id> /reload.sh`, if you are on the node where tutum/haproxy deploys
+* `tutum exec <haproxy_uuid> /reload.sh`, if you use tutum cli
+
+Note: when `reload.sh` is invoked, it doesn't necessarily mean that HAProxy will be restarted. In fact, `tutum/haproxy` will try to get the current information of the the service and calculate a new configuration. HAProxy will only be restarted when the newly generated configuration differs from the current one.

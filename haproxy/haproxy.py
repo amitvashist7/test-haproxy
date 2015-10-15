@@ -8,7 +8,7 @@ from collections import OrderedDict
 
 import tutum
 
-from parser import Specs
+from parser import Specs, parse_uuid_from_resource_uri
 
 logger = logging.getLogger("haproxy")
 
@@ -58,10 +58,12 @@ class Haproxy(object):
         self.routes_added = []
         self.require_default_route = False
         if Haproxy.cls_container_uri and Haproxy.cls_service_uri and Haproxy.cls_tutum_auth:
-            logger.info("Loading HAProxy definition through REST API")
             container = self.fetch_tutum_obj(Haproxy.cls_container_uri)
             service = self.fetch_tutum_obj(Haproxy.cls_service_uri)
             Haproxy.cls_linked_services = [srv.get("to_service") for srv in service.linked_to_service]
+            logger.info("Current links: %s", ", ".join(
+                ["%s(%s)" % (srv.get("name"), parse_uuid_from_resource_uri(srv.get("to_service"))) for srv in
+                 service.linked_to_service]))
             self.specs = Specs(container, service)
         else:
             logger.info("Loading HAProxy definition from environment variables")
@@ -91,12 +93,14 @@ class Haproxy(object):
                 self._run()
             else:
                 logger.info("HAProxy configuration remains unchanged")
+            logger.info("===========END===========")
         else:
             logger.info("HAProxy configuration:\n%s" % cfg)
             Haproxy.cls_cfg = cfg
             self._save_conf()
             logger.info("Launching HAProxy")
             p = subprocess.Popen(self.const_command)
+            logger.info("===========END===========")
             p.wait()
 
     def _run(self):
@@ -106,10 +110,10 @@ class Haproxy(object):
             process = subprocess.Popen(self.const_command + ["-sf", str(Haproxy.cls_haproxy_process.pid)])
             Haproxy.cls_haproxy_process.wait()
             Haproxy.cls_haproxy_process = process
-            logger.info("HAProxy has been reloaded\n******************************")
+            logger.info("HAProxy has been reloaded")
         else:
             # Launch haproxy
-            logger.info("Launching HAProxy\n******************************")
+            logger.info("Launching HAProxy")
             Haproxy.cls_haproxy_process = subprocess.Popen(self.const_command)
 
     @staticmethod
