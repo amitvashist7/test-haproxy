@@ -4,6 +4,7 @@ import subprocess
 import time
 import copy
 import re
+import thread
 from collections import OrderedDict
 
 import tutum
@@ -100,21 +101,30 @@ class Haproxy(object):
             self._save_conf()
             logger.info("Launching HAProxy")
             p = subprocess.Popen(self.const_command)
+            logger.info("HAProxy has been launched(PID: %s)", str(p.pid))
             logger.info("===========END===========")
             p.wait()
 
     def _run(self):
+        def _wait_pid(p):
+            if p:
+                pid = p.pid
+                p.wait()
+                logger.info("HAProxy(PID:%s) has been terminated" % str(pid))
+
         if Haproxy.cls_haproxy_process:
             # Reload haproxy
             logger.info("Reloading HAProxy")
             process = subprocess.Popen(self.const_command + ["-sf", str(Haproxy.cls_haproxy_process.pid)])
-            Haproxy.cls_haproxy_process.wait()
+            old_process = Haproxy.cls_haproxy_process
+            thread.start_new_thread(_wait_pid, (old_process,))
             Haproxy.cls_haproxy_process = process
-            logger.info("HAProxy has been reloaded")
+            logger.info("HAProxy has been reloaded(PID: %s)", str(Haproxy.cls_haproxy_process.pid))
         else:
             # Launch haproxy
             logger.info("Launching HAProxy")
             Haproxy.cls_haproxy_process = subprocess.Popen(self.const_command)
+            logger.info("HAProxy has been launched(PID: %s)", str(Haproxy.cls_haproxy_process.pid))
 
     @staticmethod
     def _prettify(cfg):
