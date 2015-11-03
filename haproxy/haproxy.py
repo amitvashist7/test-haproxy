@@ -32,6 +32,8 @@ class Haproxy(object):
     envvar_extra_default_settings = os.getenv("EXTRA_DEFAULT_SETTINGS")
     envvar_extra_bind_settings = os.getenv("EXTRA_BIND_SETTINGS")
     envvar_http_basic_auth = os.getenv("HTTP_BASIC_AUTH")
+    envvar_monitor_uri = os.getenv("MONITOR_URI", "/ping")
+    envvar_monitor_port = os.getenv("MONITOR_PORT", "80")
 
     # envvar overwritable
     envvar_balance = os.getenv("BALANCE", "roundrobin")
@@ -223,6 +225,8 @@ class Haproxy(object):
                                "stats realm Haproxy\ Statistics",
                                "stats uri /",
                                "stats auth %s" % cls.envvar_stats_auth]
+
+        cfg["frontend monitor"] = ["bind %s" % cls.envvar_monitor_port, "monitor-uri %s" % cls.envvar_monitor_uri]
 
         for opt in cls.envvar_option:
             if opt:
