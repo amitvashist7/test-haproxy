@@ -72,6 +72,7 @@ def main():
 
     pid = create_pid_file()
     signal.signal(signal.SIGUSR1, user_reload_haproxy)
+    signal.signal(signal.SIGTERM, sys.exit)
 
     if Haproxy.cls_container_uri and Haproxy.cls_service_uri:
         if Haproxy.cls_tutum_auth:
