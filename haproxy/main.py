@@ -8,7 +8,7 @@ import tutum
 from haproxy import Haproxy
 from parser import parse_uuid_from_resource_uri
 
-__version__ = '0.2'
+__version__ = "0.2.1"
 tutum.user_agent = "tutum-haproxy/%s" % __version__
 
 DEBUG = os.getenv("DEBUG", False)
