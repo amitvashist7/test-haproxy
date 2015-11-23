@@ -1,6 +1,7 @@
 FROM tutum/dind:latest
 
-RUN apt-get install -y --no-install-recommends make python-pip && \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends make python-pip && \
     pip install tutum && \
     mkdir /app
 

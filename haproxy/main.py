@@ -8,7 +8,7 @@ import tutum
 from haproxy import Haproxy
 from parser import parse_uuid_from_resource_uri
 
-__version__ = '0.2'
+__version__ = "0.2.1"
 tutum.user_agent = "tutum-haproxy/%s" % __version__
 
 DEBUG = os.getenv("DEBUG", False)
@@ -72,6 +72,7 @@ def main():
 
     pid = create_pid_file()
     signal.signal(signal.SIGUSR1, user_reload_haproxy)
+    signal.signal(signal.SIGTERM, sys.exit)
 
     if Haproxy.cls_container_uri and Haproxy.cls_service_uri:
         if Haproxy.cls_tutum_auth:
