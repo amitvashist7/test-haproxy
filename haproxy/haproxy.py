@@ -426,7 +426,7 @@ class Haproxy(object):
                     frontend.append("monitor-uri %s" % Haproxy.envvar_monitor_uri)
                     monitor_uri_configured = True
                     
-                frontend.append("maxcon %s" %  cls.envvar_maxconn)
+                frontend.append("maxconn %s" %  Haproxy.envvar_maxconn)
                 frontend.append("default_backend default_service")
                 cfg["frontend default_frontend"] = frontend
 
